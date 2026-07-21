@@ -1,0 +1,28 @@
+{
+  "name": "cooperative-cooking-game",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Three-player asymmetric cooperative browser cooking game.",
+  "packageManager": "npm@11.16.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "dev:client": "npm run dev --workspace @cooking-game/client",
+    "dev:server": "npm run dev --workspace @cooking-game/server",
+    "test:e2e": "playwright test"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "prisma": "^7.9.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

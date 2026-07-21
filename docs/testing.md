@@ -6,8 +6,44 @@ Every behavior follows RED → GREEN → REFACTOR. Configuration/scaffold integr
 
 ## Multiplayer
 
-Playwright creates three isolated browser contexts. Server tests verify capacity, role permissions, authoritative actions, deterministic randomization, timer behavior, reconnect, and completion.
+Integration tests start the real server on an ephemeral TCP port and
+connect real `@colyseus/sdk` clients over WebSockets. They verify fewer-than-three
+waiting state, the three unique roles, the ready transition, fourth-client
+rejection, strict join options, reconnection identity/role preservation, seat
+reservation during grace, and cleanup after expiry. Every test closes client
+rooms and gracefully shuts down its server so no handles remain.
+
+Phase 2 transport coverage adds seeded object state, successful pickup/drop and
+observer synchronization, WAITING and non-Blind rejection, reach rejection,
+strict invalid payload rejection, exclusive ownership, reconnect hold
+preservation, and release after grace expiry or voluntary leave. Rejections are
+checked for no mutation and sender-only sanitized errors. Cleanup skips already
+closed SDK transports before server shutdown so no leave promises hang.
+
+Shared tests prove deterministic placement and initial reachability. Client DOM
+tests cover rendering, actions, read-only roles, errors, overlapping-connection
+protection, stale callback isolation, and explicit-invite precedence. Production
+Playwright creates three isolated Chromium contexts, identifies the Blind Cook
+by authoritative role, reloads that browser to prove identity-preserving resume,
+verifies synchronized pickup/drop and non-Blind controls, then retains
+fourth-player rejection.
+
+```bash
+npm test
+npm run typecheck
+npm run build
+npm run test:e2e
+npm audit
+npm audit --omit=dev
+git diff --check
+```
+
+Use `npm.cmd` in place of `npm` on Windows when required.
 
 ## Manual matrix
 
-One PC can use three browser profiles for state testing. Real voice usability requires three people/devices. Mobile emulation covers layout; real iOS Safari and Android Chrome verify microphone, touch, orientation, and reconnect.
+For Phase 2, start `npm run dev:server` and `npm run dev:client`. Create from
+`http://localhost:5173/?player=One`, then open two isolated windows or profiles
+with `?player=Two&room=ROOM_ID` and `?player=Three&room=ROOM_ID`. Query options
+only prefill the client; all authorization remains on the server. Real voice
+usability, gestures, and the communication matrix remain Phase 3 scope.

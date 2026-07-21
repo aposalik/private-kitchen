@@ -6,14 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests"
   },
   "dependencies": {
+    "@colyseus/sdk": "^0.17.43",
+    "@cooking-game/shared": "0.1.0",
     "livekit-client": "^2.20.2",
     "phaser": "^3.90.0"
   },
   "devDependencies": {
+    "jsdom": "^26.1.0",
     "typescript": "^7.0.2",
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   }
 }

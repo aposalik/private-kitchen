@@ -20,6 +20,8 @@ export function createInitialKitchenObjects(
     label: definition.label,
     x: coordinates[index]!.x,
     y: coordinates[index]!.y,
+    preparation: "RAW",
+    location: "COUNTER",
   }));
 }
 

@@ -40,6 +40,19 @@ git diff --check
 
 Use `npm.cmd` in place of `npm` on Windows when required.
 
+## Phase 5 database and account coverage
+
+Use an isolated SQLite path for local migrations:
+
+```bash
+DATABASE_URL=file:./prisma/dev.db npm run prisma:migrate --workspace @cooking-game/server
+npm run prisma:generate --workspace @cooking-game/server
+```
+
+Repository and HTTP tests create temporary databases and disconnect before removal. They cover normalized uniqueness, sessions, preferences, one-time history, owner-scoped recipes, password policy, generic login failures, cookie flags, origin rejection, JSON bounds, rate limits, and authorization. Room integration tests use real cookie headers over Colyseus and verify terminal history without public identity leakage. Client DOM tests cover restoration, account actions, pending/error states, and saved-name precedence. `tests/e2e/auth.spec.ts` exercises cookie restoration, preferences, an authenticated win/history row, recipe ownership isolation, logout persistence, and guest joins in production Chromium.
+
+The in-memory authentication limiter is deterministic and testable but is not shared between processes. Deployment behind multiple server instances needs a shared limiter before relying on it as the only brute-force control.
+
 ## Manual matrix
 
 For Phase 2, start `npm run dev:server` and `npm run dev:client`. Create from

@@ -18,6 +18,8 @@ export const INITIAL_PLACEMENT_BOUNDS = {
   maxY: 50,
 } as const;
 
+export const KITCHEN_OBJECT_KINDS = ["TOMATO", "ONION", "CARROT", "POTATO"] as const;
+
 export const KITCHEN_OBJECT_DEFINITIONS = [
   { kind: "TOMATO", label: "Tomato" },
   { kind: "ONION", label: "Onion" },
@@ -25,8 +27,13 @@ export const KITCHEN_OBJECT_DEFINITIONS = [
   { kind: "POTATO", label: "Potato" },
 ] as const;
 
-export type KitchenObjectKind =
-  (typeof KITCHEN_OBJECT_DEFINITIONS)[number]["kind"];
+export type KitchenObjectKind = (typeof KITCHEN_OBJECT_KINDS)[number];
+
+export const KITCHEN_OBJECT_PREPARATIONS = ["RAW", "CHOPPED", "RUINED"] as const;
+export const KITCHEN_OBJECT_LOCATIONS = ["COUNTER", "POT"] as const;
+
+export type KitchenObjectPreparation = (typeof KITCHEN_OBJECT_PREPARATIONS)[number];
+export type KitchenObjectLocation = (typeof KITCHEN_OBJECT_LOCATIONS)[number];
 
 export const INITIAL_OBJECT_COUNT = KITCHEN_OBJECT_DEFINITIONS.length;
 
@@ -37,6 +44,8 @@ export interface KitchenObjectState {
   readonly x: number;
   readonly y: number;
   readonly heldBy?: string;
+  readonly preparation: KitchenObjectPreparation;
+  readonly location: KitchenObjectLocation;
 }
 
 export interface KitchenObjectCollection {

@@ -1,0 +1,72 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Account {
+  id                 String        @id @default(cuid())
+  username           String
+  normalizedUsername String        @unique
+  displayName        String
+  passwordHash       String
+  passwordSalt       String
+  reducedMotion      Boolean       @default(false)
+  highContrast       Boolean       @default(false)
+  masterVolume       Int           @default(100)
+  voiceVolume        Int           @default(100)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  sessions           Session[]
+  gameHistory        GameHistory[]
+  ownedRecipes       OwnedRecipe[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  accountId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([expiresAt])
+}
+
+model GameHistory {
+  id                 String   @id @default(cuid())
+  accountId          String
+  roundId            String
+  roomId             String
+  recipeId           String
+  outcome            String
+  outcomeReason      String
+  completedStepCount Int
+  totalStepCount     Int
+  durationMs         Int
+  finishedAt         DateTime
+  createdAt          DateTime @default(now())
+  account            Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, roundId])
+  @@index([accountId, finishedAt])
+}
+
+model OwnedRecipe {
+  id           String   @id @default(cuid())
+  accountId    String
+  title        String
+  documentJson String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  account      Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, updatedAt])
+}

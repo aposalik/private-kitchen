@@ -1,4 +1,5 @@
 export * from "./actions.js";
+export * from "./communication.js";
 export * from "./game-state.js";
 export * from "./protocol.js";
 export * from "./randomization.js";

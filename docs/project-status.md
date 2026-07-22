@@ -2,51 +2,62 @@
 
 ## Current phase
 
-Phase 2 — Authoritative interaction loop: complete.
+Phase 5 — Accounts and persistence: implementation and verification in the working tree.
 
-## Verified
+## Phase 5 delivered
 
-- npm workspaces installed
-- structure test: pass
-- TypeScript typecheck: pass across five workspaces
-- production builds: pass
-- production dependency audit: 0 vulnerabilities
-- Git repository initialized on `main`
-- real `@colyseus/core` / WebSocket authoritative server
-- exactly-three private room capacity and ready transition
-- deterministic unique roles in connection order
-- bounded reconnect preserving player identity and role
-- real-client integration coverage on ephemeral ports with clean shutdown
-- functional mobile-landscape lobby for create, invite join, and room status
-- production Chromium E2E: three isolated contexts reach `3 / 3` and `READY` with unique roles
-- production Chromium E2E: fourth context rejected and returned to `DISCONNECTED`
-- browser matchmaking waits for the first authoritative schema state before snapshotting
-- connection lifecycle blocks overlapping joins and ignores stale room callbacks
-- invite URLs attempt identity-preserving resume first, then auto-join once only when resume is unavailable
-- production Chromium reload restores the same authoritative role and ready room
-- project and production dependency audits: 0 vulnerabilities
-- server-owned kitchen objects with a public placement seed
-- deterministic seeded placement with stable IDs/kinds and reachable positions
-- strict authoritative `PICK_UP` / `DROP` validation and sender-only errors
-- READY, role, reach, bounds, holder, and exclusive-ownership gates
-- hold preservation through grace/reconnect and confirmed-leave release
-- synchronized object UI with Blind Cook controls and read-only role guidance
-- real transport and production Chromium Phase 2 coverage
+- Prisma 7 SQLite accounts, hashed sessions, preferences, authoritative game history, and owner-scoped validated recipes
+- bounded scrypt password authentication and opaque HttpOnly strict same-site cookies with rotation, expiry, revocation, and production Secure behavior
+- same-origin Express API with strict validation, origin defense, body limits, sanitized errors, and IP-plus-normalized-username rate limiting
+- Colyseus cookie identity resolution with server-only account association and one-time terminal history writes
+- optional account UI with browser-restart restoration, saved display-name fill, preferences, history, owned recipes, and persistent sign-out
+- Vite API proxy, repository/API/room/client tests, and a production-browser auth scenario while preserving the unchanged three-player guest scenario
+
+## Phase 4 delivered
+
+- strict versioned Tomato Soup contract: two tomatoes and one onion, chop, add to pot, season, boil, mix, and plate
+- server-authoritative five-minute countdown with immediate timeout loss, exact pause on disconnect, and resume after reconnect or seat replacement
+- authoritative bounded ingredient preparation/location, ruin-and-replacement behavior, progress, terminal win/loss, and post-result interaction lockout
+- recipient-private recipe payload delivered only to the authoritative Recipe Keeper; Blind Cook and Deaf Guide never receive it
+- Blind Cook-only physical and cooking commands with strict payloads, role checks, ownership/reach checks, monotonic replay protection, and server-derived outcomes
+- authoritative client HUD, private Recipe Keeper instructions, contextual Blind Cook controls, pause guidance, sanitized errors, and result screens
+- preserved Phase 3 enum-only communication, bounded drawing/pointing, visual exclusion, and directed audio-only WebRTC
+- isolated production Chromium flow completes the entire Tomato Soup recipe, verifies privacy/timer/reconnect/communication, wins, locks controls, and rejects a fourth player
+
+## Independent review corrections
+
+- persisted the Phase 3 communication/voice sequence across page-reload reconnects so valid post-resume signals are not rejected as stale
+- blocked pickup/drop after terminal outcomes on the server, not only in the UI
+- reapplied current object-point highlights after authoritative cooking updates replace object rows without restoring timer-driven DOM churn
+
+## Final Phase 4 verification — 2026-07-22
+
+- `npm.cmd run test`: 168 tests passed (structure 1, client 96, server 45, recipe schema 9, shared 17)
+- `npm.cmd run typecheck`: all five workspaces passed
+- `npm.cmd run build`: all five ordered production builds passed
+- `npm.cmd audit --audit-level=low`: 0 vulnerabilities
+- `npm.cmd audit --omit=dev --audit-level=low`: 0 vulnerabilities
+- production Chromium E2E: 1 scenario passed in 10.9s (8.8s test body)
+- `git diff --check`: passed; line-ending notices only
+- 87-file safety scan: no high-confidence secrets, unsafe dynamic execution/debuggers, BOMBANANA markers, TODO/FIXME/HACK artifacts, or credential-like files
+- final Git inspection: branch `main`, base HEAD `ed98e5c`; Phase 3 and Phase 4 remain intentionally uncommitted and were not reset, cleaned, stashed, or committed
+
+## Live development handoff
+
+- server: port `2567`, verified accepting TCP connections with log `Kitchen server listening on port 2567`
+- client: `http://localhost:5173`, verified HTTP 200
+- persistent-process Chromium smoke: created a real room and received `1 / 3`, `Waiting`, and `Blind Cook` with zero page errors
+
+## Remaining manual deployment check
+
+- Run an audible three-physical-device microphone/speaker test on the target LAN. Automated Chromium verifies the directed WebRTC track matrix with isolated contexts and fake microphones, but cannot prove room acoustics or physical-device quality.
 
 ## Next planned slice
 
-Phase 3: gestures, emotes, limited cards, constrained drawing, and server-issued
-role communication/voice permissions. Recipes and timers remain Phase 4.
+Phase 5 — Accounts and persistence: persist identity, preferences, game history, and recipe ownership with secure authentication and authorization tests.
 
-## Open product decision
+## Earlier phase evidence
 
-Choose timer expiration behavior: immediate loss, overtime with score penalty, short grace period then loss, or recipe-specific behavior.
-
-## Phase 2 verification evidence
-
-- `npm.cmd test`: 49 tests passed (structure 1, client 17, server 25, shared 6)
-- `npm.cmd run typecheck`: all five workspaces passed
-- `npm.cmd run build`: all five workspace production builds passed
-- `npm.cmd run test:e2e`: 1 production Chromium scenario passed
-- `npm.cmd audit`: 0 vulnerabilities
-- `npm.cmd audit --omit=dev`: 0 vulnerabilities
+- Phase 2 trusted commit `ed98e5c`: 49 tests, five type-checks/builds, production Chromium E2E, and zero audit findings.
+- Phase 3 working tree: 105 tests, five type-checks/builds, production four-context Chromium, directed fake-media WebRTC (Recipe 2 streams, Blind 1, Deaf 0), and zero audit findings.
+- Detailed Phase 4 RED/GREEN history: `.hermes/phase4-red-green.md`.

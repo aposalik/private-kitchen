@@ -60,3 +60,16 @@ Three isolated clients join one private Colyseus room. The room rejects player f
 The browser panel lists synchronized objects and holder status. The Blind Cook
 gets READY-gated Pick up / Drop controls; other roles get read-only guidance and
 no interaction buttons. Dynamic state and errors are assigned with `textContent`.
+
+## Phase 5 accounts and persistence
+
+- Accounts remain optional; guest room creation, joining, roles, privacy, and all server authority are unchanged.
+- Express handles `/api` on the same HTTP server as Colyseus. Vite proxies `/api` in development and preview, so browser authentication remains same-origin.
+- Prisma 7 uses the ESM `prisma-client` generator and `@prisma/adapter-better-sqlite3`. SQLite paths come from `DATABASE_URL`; production migrations use the checked-in Prisma migration.
+- Usernames are normalized for case-insensitive uniqueness. Passwords use a random 128-bit salt and bounded scrypt (`N=32768`, `r=8`, `p=1`, 32-byte output), with constant-time comparison.
+- Browser sessions are random 256-bit opaque values. Only a SHA-256 token hash is stored. The raw value exists only in an `HttpOnly`, `SameSite=Strict`, path-wide, expiring cookie (`Secure` in production).
+- Mutations require an allowed `Origin`; strict Zod bodies, a 16 KiB JSON limit, generic authentication failures, and per-process IP-plus-username rate limits bound abuse. The limiter is intentionally single-process and must be replaced before horizontal scaling.
+- Preferences, history, and owned recipes derive ownership only from the resolved session. Recipe documents pass the existing versioned validator and record IDs are generated server-side.
+- Colyseus resolves the cookie from `AuthContext.headers`. Account IDs stay in server-only client auth metadata and never enter room state. A terminal callback records one row per authenticated account and room; database uniqueness makes duplicate callbacks harmless.
+
+Only username, display name, preferences, timestamps, authoritative round summaries, and owned recipe documents are retained. There is no email, profile tracking, plaintext password, or browser-readable auth token.

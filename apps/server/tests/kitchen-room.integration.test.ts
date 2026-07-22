@@ -3,6 +3,7 @@ import { ErrorCode } from "@colyseus/core";
 import { afterEach, describe, expect, test } from "vitest";
 
 import {
+  COMMUNICATION_MESSAGES,
   KITCHEN_MESSAGES,
   KITCHEN_ROOM_NAME,
   type InteractionErrorPayload,
@@ -13,6 +14,11 @@ import { startKitchenServer, type RunningKitchenServer } from "../src/index.js";
 describe("KitchenRoom capacity", () => {
   let running: RunningKitchenServer | undefined;
   const rooms: ClientRoom<KitchenRoomState>[] = [];
+  const pushRooms = rooms.push.bind(rooms);
+  rooms.push = (...added) => {
+    for (const room of added) registerPhase3NoopHandlers(room);
+    return pushRooms(...added);
+  };
 
   afterEach(async () => {
     await Promise.allSettled(
@@ -110,6 +116,7 @@ describe("KitchenRoom capacity", () => {
     const reconnected = await new Client(running.endpoint).reconnect<KitchenRoomState>(
       reconnectionToken,
     );
+    registerPhase3NoopHandlers(reconnected);
     rooms.splice(1, 1, reconnected);
     await waitForState(observer, (state) => state.connectedCount === 3);
 
@@ -147,6 +154,7 @@ describe("KitchenRoom capacity", () => {
     const replacement = await client.joinById<KitchenRoomState>(observer.roomId, {
       displayName: "Replacement",
     });
+    registerPhase3NoopHandlers(replacement);
     rooms.splice(2, 1, replacement);
     await waitForState(observer, (state) => state.connectedCount === 3);
     expect(replacement.state.players.get(replacement.sessionId)?.role).toBe(
@@ -324,6 +332,7 @@ describe("KitchenRoom capacity", () => {
     expect(ready.observer.state.objects.get(object.id)?.heldBy).toBe(sessionId);
 
     const reconnected = await new Client(running!.endpoint).reconnect<KitchenRoomState>(token);
+    registerPhase3NoopHandlers(reconnected);
     rooms.splice(rooms.indexOf(ready.blindCook), 1, reconnected);
     await waitForState(ready.observer, (state) => state.status === "READY");
     expect(ready.observer.state.objects.get(object.id)?.heldBy).toBe(sessionId);
@@ -420,6 +429,17 @@ function nextInteractionError(
       },
     );
   });
+}
+
+function registerPhase3NoopHandlers(room: ClientRoom<KitchenRoomState>): void {
+  for (const type of [
+    COMMUNICATION_MESSAGES.voiceGrant,
+    COMMUNICATION_MESSAGES.boardSnapshot,
+    COMMUNICATION_MESSAGES.event,
+    COMMUNICATION_MESSAGES.drawingStroke,
+    COMMUNICATION_MESSAGES.error,
+    COMMUNICATION_MESSAGES.voiceRelay,
+  ]) room.onMessage(type, () => undefined);
 }
 
 function waitForState(

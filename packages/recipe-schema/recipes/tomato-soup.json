@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "tomato-soup",
+  "title": "Tomato Soup",
+  "roundDurationMs": 300000,
+  "ingredients": [
+    { "id": "tomato", "kind": "TOMATO", "count": 2 },
+    { "id": "onion", "kind": "ONION", "count": 1 }
+  ],
+  "steps": [
+    { "id": "chop-tomato", "action": "CHOP", "ingredientId": "tomato", "dependsOn": [] },
+    { "id": "chop-onion", "action": "CHOP", "ingredientId": "onion", "dependsOn": [] },
+    { "id": "add-tomato", "action": "ADD_TO_POT", "ingredientId": "tomato", "dependsOn": ["chop-tomato"] },
+    { "id": "add-onion", "action": "ADD_TO_POT", "ingredientId": "onion", "dependsOn": ["chop-onion"] },
+    { "id": "season", "action": "SEASON", "dependsOn": ["add-tomato", "add-onion"] },
+    { "id": "boil", "action": "BOIL", "dependsOn": ["season"] },
+    { "id": "mix", "action": "MIX", "dependsOn": ["boil"] },
+    { "id": "plate", "action": "PLATE", "dependsOn": ["mix"] }
+  ]
+}

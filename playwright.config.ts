@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { createE2eDatabase, removeE2eDatabase } from "./tests/e2e/database-lifecycle.mjs";
+
+const e2eDatabase = createE2eDatabase();
+process.once("exit", () => removeE2eDatabase(e2eDatabase.directory));
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -18,11 +22,11 @@ export default defineConfig({
   }],
   webServer: [
     {
-      command: "node apps/server/dist/index.js",
+      command: "npm run start --workspace @cooking-game/server",
       port: 2567,
       env: {
-        NODE_ENV: "test",
-        DATABASE_URL: "file::memory:",
+        NODE_ENV: "e2e",
+        DATABASE_URL: e2eDatabase.databaseUrl,
       },
       reuseExistingServer: false,
       stdout: "pipe",

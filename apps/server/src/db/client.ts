@@ -24,9 +24,25 @@ export async function migrateDatabase(database: DatabaseClient): Promise<void> {
   }
 }
 
-export async function ensureDatabaseSchema(database: DatabaseClient): Promise<void> {
-  const rows = await database.$queryRawUnsafe<Array<{ name: string }>>(
-    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Account'",
+export async function ensureDatabaseSchema(
+  database: DatabaseClient,
+  options: { allowBootstrap?: boolean } = {},
+): Promise<void> {
+  const tables = await database.$queryRawUnsafe<Array<{ name: string }>>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('Account', '_prisma_migrations')",
   );
-  if (rows.length === 0) await migrateDatabase(database);
+  const names = new Set(tables.map(({ name }) => name));
+  if (options.allowBootstrap) {
+    if (!names.has("Account")) await migrateDatabase(database);
+    return;
+  }
+  if (names.has("Account") && names.has("_prisma_migrations")) {
+    const applied = await database.$queryRawUnsafe<Array<{ migration_name: string }>>(
+      "SELECT migration_name FROM _prisma_migrations WHERE migration_name = '20260722170000_phase5_accounts' AND finished_at IS NOT NULL AND rolled_back_at IS NULL",
+    );
+    if (applied.length === 1) return;
+  }
+  throw new Error(
+    "Database schema is not managed by the checked-in Prisma migration. Run `npm run prisma:migrate --workspace @cooking-game/server` before starting the server.",
+  );
 }

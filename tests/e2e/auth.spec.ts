@@ -14,6 +14,17 @@ test("account persists, owns data and history, signs out, while guests still joi
   await page.reload();
   await expect(page.locator("[data-authenticated-account]")).toHaveText("Saved Cook");
   await expect(page.locator(".join-panel [name=displayName]")).toHaveValue("Saved Cook");
+
+  const restartedContext = await browser.newContext({ storageState: await page.context().storageState() });
+  try {
+    const restartedPage = await restartedContext.newPage();
+    await restartedPage.goto("/");
+    await expect(restartedPage.locator("[data-authenticated-account]")).toHaveText("Saved Cook");
+    await expect(restartedPage.locator(".join-panel [name=displayName]")).toHaveValue("Saved Cook");
+  } finally {
+    await restartedContext.close();
+  }
+
   await page.locator("[name=reducedMotion]").check();
   await page.locator("[name=masterVolume]").fill("35");
   await page.locator('[data-auth-action="save-preferences"]').click();

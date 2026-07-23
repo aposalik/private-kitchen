@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "test": "node --test tests/*.test.mjs && npm run test --workspaces --if-present",
+    "pretypecheck": "npm run build --workspace @cooking-game/shared && npm run build --workspace @cooking-game/recipe-schema && npm run build --workspace @cooking-game/test-utils",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspace @cooking-game/shared && npm run build --workspace @cooking-game/recipe-schema && npm run build --workspace @cooking-game/test-utils && npm run build --workspace @cooking-game/server && npm run build --workspace @cooking-game/client",
     "dev:client": "npm run dev --workspace @cooking-game/client",

@@ -49,6 +49,8 @@ DATABASE_URL=file:./prisma/dev.db npm run prisma:migrate --workspace @cooking-ga
 npm run prisma:generate --workspace @cooking-game/server
 ```
 
+`npm run dev:server` deploys checked-in Prisma migrations before starting its watcher. Production deployments must run the migration command before starting `apps/server/dist/index.js`; runtime SQL bootstrap is test-only.
+
 Repository and HTTP tests create temporary databases and disconnect before removal. They cover normalized uniqueness, sessions, preferences, one-time history, owner-scoped recipes, password policy, generic login failures, cookie flags, origin rejection, JSON bounds, rate limits, and authorization. Room integration tests use real cookie headers over Colyseus and verify terminal history without public identity leakage. Client DOM tests cover restoration, account actions, pending/error states, and saved-name precedence. `tests/e2e/auth.spec.ts` exercises cookie restoration, preferences, an authenticated win/history row, recipe ownership isolation, logout persistence, and guest joins in production Chromium.
 
 The in-memory authentication limiter is deterministic and testable but is not shared between processes. Deployment behind multiple server instances needs a shared limiter before relying on it as the only brute-force control.
@@ -60,3 +62,7 @@ For Phase 2, start `npm run dev:server` and `npm run dev:client`. Create from
 with `?player=Two&room=ROOM_ID` and `?player=Three&room=ROOM_ID`. Query options
 only prefill the client; all authorization remains on the server. Real voice
 usability, gestures, and the communication matrix remain Phase 3 scope.
+
+## Production migration lifecycle
+
+`npm run start --workspace @cooking-game/server` runs `prisma migrate deploy` through `prestart` before launching `dist/index.js`. Production Chromium uses this same path with a unique temporary SQLite directory; after Playwright terminates its web servers, process-exit cleanup removes the database and every journal/WAL sidecar. It must not use the test-only in-memory bootstrap path.

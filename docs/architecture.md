@@ -66,6 +66,7 @@ no interaction buttons. Dynamic state and errors are assigned with `textContent`
 - Accounts remain optional; guest room creation, joining, roles, privacy, and all server authority are unchanged.
 - Express handles `/api` on the same HTTP server as Colyseus. Vite proxies `/api` in development and preview, so browser authentication remains same-origin.
 - Prisma 7 uses the ESM `prisma-client` generator and `@prisma/adapter-better-sqlite3`. SQLite paths come from `DATABASE_URL`; production migrations use the checked-in Prisma migration.
+- Persistent databases are created and upgraded only through Prisma migrations. Runtime SQL bootstrap is restricted to isolated test/in-memory databases so a live database cannot bypass Prisma's migration ledger.
 - Usernames are normalized for case-insensitive uniqueness. Passwords use a random 128-bit salt and bounded scrypt (`N=32768`, `r=8`, `p=1`, 32-byte output), with constant-time comparison.
 - Browser sessions are random 256-bit opaque values. Only a SHA-256 token hash is stored. The raw value exists only in an `HttpOnly`, `SameSite=Strict`, path-wide, expiring cookie (`Secure` in production).
 - Mutations require an allowed `Origin`; strict Zod bodies, a 16 KiB JSON limit, generic authentication failures, and per-process IP-plus-username rate limits bound abuse. The limiter is intentionally single-process and must be replaced before horizontal scaling.

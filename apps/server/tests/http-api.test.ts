@@ -60,6 +60,13 @@ describe("account HTTP API", () => {
     expect(registered.headers.get("set-cookie")).toMatch(/Max-Age=60/i);
     expect(cookie).not.toMatch(/password|alice/i);
 
+    const signedOutSession = await get("/api/auth/session");
+    expect(signedOutSession.status).toBe(200);
+    expect(await signedOutSession.json()).toEqual({ account: null });
+    const restoredSession = await get("/api/auth/session", cookie);
+    expect(restoredSession.status).toBe(200);
+    expect(await restoredSession.json()).toEqual({ account: { username: "Alice_01", displayName: "Alice" } });
+
     const me = await get("/api/auth/me", cookie);
     expect(me.status).toBe(200);
     expect(await me.json()).toEqual({ account: { username: "Alice_01", displayName: "Alice" } });

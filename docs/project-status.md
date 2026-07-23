@@ -2,7 +2,7 @@
 
 ## Current phase
 
-Phase 5 — Accounts and persistence: implementation and verification in the working tree.
+Phase 5 — Accounts and persistence: implemented, independently reviewed, and verified.
 
 ## Phase 5 delivered
 
@@ -12,6 +12,23 @@ Phase 5 — Accounts and persistence: implementation and verification in the wor
 - Colyseus cookie identity resolution with server-only account association and one-time terminal history writes
 - optional account UI with browser-restart restoration, saved display-name fill, preferences, history, owned recipes, and persistent sign-out
 - Vite API proxy, repository/API/room/client tests, and a production-browser auth scenario while preserving the unchanged three-player guest scenario
+
+## Final Phase 5 verification — 2026-07-23
+
+- `npm.cmd test`: 192 tests passed (structure 2, client 103, server 61, recipe schema 9, shared 17)
+- `npm.cmd run typecheck` and `npm.cmd run build`: all five workspaces passed; compiled Prisma ESM startup verified
+- both high-severity npm audits: 0 vulnerabilities across 464 dependencies
+- production Chromium: fresh database migrated through server `prestart`, then authenticated persistence/ownership/history/browser-restart and unchanged three-player lobby scenarios both passed
+- persistent migration safety verified for empty, legacy raw, and correctly migrated databases; correctly migrated startup remains idempotent
+- repository restart test reopens SQLite and retains account, preferences, active session, history, and owned recipe data
+- `git diff --check` and security scans passed; ignored persistent development database is live and no database artifact is tracked
+- live Chromium at `http://localhost:5173`: HTTP 200, account/guest controls enabled, zero page or console errors, and clean visual smoke screenshot
+
+## Reopened Phase 5 completion correction — 2026-07-23
+
+- added a production `prestart` migration deployment and compiled `start` command; Playwright now verifies that exact lifecycle against a unique fresh SQLite database
+- expanded restart persistence verification to include active session, game history, and owner-scoped recipe data in addition to account/preferences
+- reran all gates from stopped processes: 192 tests, all typechecks/builds, zero audit vulnerabilities, two production Chromium scenarios, migration matrix, security/diff checks, and clean live Chromium
 
 ## Phase 4 delivered
 
@@ -54,7 +71,7 @@ Phase 5 — Accounts and persistence: implementation and verification in the wor
 
 ## Next planned slice
 
-Phase 5 — Accounts and persistence: persist identity, preferences, game history, and recipe ownership with secure authentication and authorization tests.
+Phase 6 — Mobile and browser support: responsive landscape and touch support across the roadmap browser matrix.
 
 ## Earlier phase evidence
 

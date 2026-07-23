@@ -24,9 +24,8 @@ export interface AuthGateway {
 
 export class AuthClient implements AuthGateway {
   async restore(): Promise<Account | null> {
-    const response = await this.request("/api/auth/me", { allowUnauthorized: true });
-    if (!response) return null;
-    return (response as { account: Account }).account;
+    const response = await this.request("/api/auth/session");
+    return (response as { account: Account | null }).account;
   }
 
   async register(input: { username: string; displayName: string; password: string }): Promise<Account> {
@@ -70,7 +69,7 @@ export class AuthClient implements AuthGateway {
 
   private async request(
     path: string,
-    options: { method?: "POST" | "PATCH"; body?: unknown; allowUnauthorized?: boolean } = {},
+    options: { method?: "POST" | "PATCH"; body?: unknown } = {},
   ): Promise<unknown | null> {
     const response = await fetch(path, {
       method: options.method ?? "GET",
@@ -80,7 +79,6 @@ export class AuthClient implements AuthGateway {
         body: JSON.stringify(options.body),
       }),
     });
-    if (options.allowUnauthorized && response.status === 401) return null;
     if (!response.ok) throw new Error(`Account request failed (${response.status})`);
     if (response.status === 204) return null;
     return response.json() as Promise<unknown>;

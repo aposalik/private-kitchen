@@ -65,4 +65,4 @@ usability, gestures, and the communication matrix remain Phase 3 scope.
 
 ## Production migration lifecycle
 
-`npm run start --workspace @cooking-game/server` runs `prisma migrate deploy` through `prestart` before launching `dist/index.js`. Production Chromium uses this same path with a unique temporary SQLite database; it must not use the test-only in-memory bootstrap path.
+`npm run start --workspace @cooking-game/server` runs `prisma migrate deploy` through `prestart` before launching `dist/index.js`. Production Chromium uses this same path with a unique temporary SQLite directory; after Playwright terminates its web servers, process-exit cleanup removes the database and every journal/WAL sidecar. It must not use the test-only in-memory bootstrap path.

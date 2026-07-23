@@ -26,6 +26,7 @@ export interface StartKitchenServerOptions {
   allowedOrigins?: readonly string[];
   sessionTtlMs?: number;
   now?: () => Date;
+  bootstrapTestDatabase?: boolean;
 }
 
 export interface RunningKitchenServer {
@@ -48,10 +49,18 @@ export async function startKitchenServer(
   options: StartKitchenServerOptions = {},
 ): Promise<RunningKitchenServer> {
   const hostname = options.hostname ?? "127.0.0.1";
-  const database = createDatabaseClient(
-    options.databaseUrl ?? (process.env.NODE_ENV === "test" ? "file::memory:" : undefined),
-  );
-  await ensureDatabaseSchema(database);
+  const databaseUrl = options.databaseUrl
+    ?? (process.env.NODE_ENV === "test" ? "file::memory:" : process.env.DATABASE_URL);
+  const database = createDatabaseClient(databaseUrl);
+  try {
+    await ensureDatabaseSchema(database, {
+      allowBootstrap: options.bootstrapTestDatabase
+        ?? (process.env.NODE_ENV === "test" || databaseUrl === "file::memory:"),
+    });
+  } catch (error) {
+    await database.$disconnect();
+    throw error;
+  }
   const repository = new PrismaRepository(database);
   const now = options.now ?? (() => new Date());
   const sessionTtlMs = options.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;

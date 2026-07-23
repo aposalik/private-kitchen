@@ -4,7 +4,12 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TOMATO_SOUP_RECIPE } from "@cooking-game/recipe-schema";
-import { createDatabaseClient, migrateDatabase, type DatabaseClient } from "../src/db/client.js";
+import {
+  createDatabaseClient,
+  ensureDatabaseSchema,
+  migrateDatabase,
+  type DatabaseClient,
+} from "../src/db/client.js";
 import { PrismaRepository } from "../src/db/repository.js";
 
 describe("PrismaRepository", () => {
@@ -68,6 +73,66 @@ describe("PrismaRepository", () => {
     expect(await repository.getPreferences(account.id)).toEqual(preferences);
   });
 
+  it("persists account data after the SQLite client is closed and reopened", async () => {
+    const account = await createAccount(repository, "restart-user");
+    await repository.updatePreferences(account.id, {
+      reducedMotion: true,
+      highContrast: false,
+      masterVolume: 42,
+      voiceVolume: 73,
+    });
+    const sessionExpiresAt = new Date("2099-01-01T00:00:00.000Z");
+    await repository.createSession({
+      accountId: account.id,
+      tokenHash: "restart-token-hash",
+      expiresAt: sessionExpiresAt,
+    });
+    await repository.recordGameHistoryOnce({
+      accountId: account.id,
+      roundId: "restart-room:round-1",
+      roomId: "restart-room",
+      recipeId: "tomato-soup",
+      outcome: "WON",
+      outcomeReason: "COMPLETED",
+      completedStepCount: 10,
+      totalStepCount: 10,
+      durationMs: 30_000,
+      finishedAt: new Date("2026-07-23T00:00:00.000Z"),
+    });
+    const ownedRecipe = await repository.createOwnedRecipe(account.id, TOMATO_SOUP_RECIPE);
+
+    await database.$disconnect();
+    database = createDatabaseClient(`file:${join(directory, "test.db")}`);
+    repository = new PrismaRepository(database);
+
+    expect(await repository.findAccountByNormalizedUsername("restart-user")).toMatchObject({
+      username: "restart-user",
+      displayName: "restart-user",
+    });
+    expect(await repository.getPreferences(account.id)).toEqual({
+      reducedMotion: true,
+      highContrast: false,
+      masterVolume: 42,
+      voiceVolume: 73,
+    });
+    expect(await repository.findActiveSession(
+      "restart-token-hash",
+      new Date("2098-12-31T23:59:59.000Z"),
+    )).toMatchObject({ account: { id: account.id }, expiresAt: sessionExpiresAt });
+    expect(await repository.listGameHistory(account.id)).toEqual([
+      expect.objectContaining({
+        roundId: "restart-room:round-1",
+        outcome: "WON",
+        completedStepCount: 10,
+      }),
+    ]);
+    expect(await repository.findOwnedRecipe(account.id, ownedRecipe.id)).toMatchObject({
+      id: ownedRecipe.id,
+      title: TOMATO_SOUP_RECIPE.title,
+      document: TOMATO_SOUP_RECIPE,
+    });
+  });
+
   it("records a terminal round only once per account and round", async () => {
     const account = await createAccount(repository, "historian");
     const history = {
@@ -98,6 +163,22 @@ describe("PrismaRepository", () => {
     expect(await repository.updateOwnedRecipe(stranger.id, created.id, TOMATO_SOUP_RECIPE)).toBeNull();
     expect(await repository.deleteOwnedRecipe(stranger.id, created.id)).toBe(false);
     expect(await repository.listOwnedRecipes(owner.id)).toHaveLength(1);
+  });
+
+  it("does not bootstrap persistent databases outside the Prisma migration ledger", async () => {
+    const freshDatabase = createDatabaseClient(`file:${join(directory, "fresh.db")}`);
+    try {
+      await expect(ensureDatabaseSchema(freshDatabase)).rejects.toThrow(
+        "npm run prisma:migrate",
+      );
+      await expect(ensureDatabaseSchema(freshDatabase, { allowBootstrap: true })).resolves.toBeUndefined();
+      expect(await freshDatabase.account.count()).toBe(0);
+      await expect(ensureDatabaseSchema(freshDatabase)).rejects.toThrow(
+        "checked-in Prisma migration",
+      );
+    } finally {
+      await freshDatabase.$disconnect();
+    }
   });
 });
 

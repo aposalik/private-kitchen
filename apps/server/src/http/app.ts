@@ -105,6 +105,16 @@ export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
     response.status(204).end();
   }));
 
+  app.get("/api/auth/session", asyncHandler(async (request, response) => {
+    const token = readSessionToken(request.get("cookie"));
+    const session = await sessions.resolveToken(token);
+    if (!session) {
+      if (token) response.setHeader("set-cookie", sessions.clearCookie());
+      return response.json({ account: null });
+    }
+    response.json({ account: publicAccount(session.account) });
+  }));
+
   app.get("/api/auth/me", authenticate(sessions), (request, response) => {
     response.json({ account: publicAccount(response.locals.account) });
   });

@@ -3,13 +3,12 @@ import { hashPassword, verifyPassword, type ScryptParameters } from "./password.
 import { normalizeUsername } from "./validation.js";
 
 const DUMMY_SALT = Buffer.alloc(16, 7).toString("base64url");
+const DUMMY_HASH = Buffer.alloc(32, 11).toString("base64url");
 
 export class AuthenticationError extends Error {}
 export class UsernameTakenError extends Error {}
 
 export class AuthService {
-  private dummyHash: Promise<string> | undefined;
-
   constructor(
     private readonly repository: PrismaRepository,
     private readonly scryptParameters: ScryptParameters,
@@ -35,15 +34,11 @@ export class AuthService {
     const account = await this.repository.findAccountByNormalizedUsername(normalizeUsername(input.username));
     const valid = account
       ? await verifyPassword(input.password, account.passwordHash, account.passwordSalt, this.scryptParameters)
-      : await verifyPassword(input.password, await this.getDummyHash(), DUMMY_SALT, this.scryptParameters);
+      : await verifyPassword(input.password, DUMMY_HASH, DUMMY_SALT, this.scryptParameters);
     if (!account || !valid) throw new AuthenticationError("Invalid username or password");
     return account;
   }
 
-  private async getDummyHash(): Promise<string> {
-    this.dummyHash ??= hashPassword("dummy-password-value", this.scryptParameters).then(({ passwordHash }) => passwordHash);
-    return this.dummyHash;
-  }
 }
 
 function isPrismaError(error: unknown, code: string): boolean {

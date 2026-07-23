@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const e2eDatabaseUrl = `file:${join(tmpdir(), `private-kitchen-e2e-${process.pid}.db`).replaceAll("\\", "/")}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -18,11 +22,11 @@ export default defineConfig({
   }],
   webServer: [
     {
-      command: "node apps/server/dist/index.js",
+      command: "npm run start --workspace @cooking-game/server",
       port: 2567,
       env: {
-        NODE_ENV: "test",
-        DATABASE_URL: "file::memory:",
+        NODE_ENV: "e2e",
+        DATABASE_URL: e2eDatabaseUrl,
       },
       reuseExistingServer: false,
       stdout: "pipe",

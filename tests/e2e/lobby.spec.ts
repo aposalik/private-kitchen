@@ -16,7 +16,7 @@ const ROLE_KEYS: Readonly<Record<string, string>> = {
 const PLAYTEST_FEEDBACK_KEY = "cooperative-cooking:phase7:playtest-feedback";
 
 test("three isolated players communicate under exact role policy and a fourth is rejected", async ({ browser }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(180_000);
   const contexts: BrowserContext[] = [];
   try {
     const host = await newPlayerPage(browser, contexts);

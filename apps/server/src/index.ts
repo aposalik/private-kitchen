@@ -102,6 +102,12 @@ export async function startKitchenServer(
       return session ? { accountId: session.accountId, expiresAt: session.expiresAt } : undefined;
     },
     recordGameHistory: (history) => repository.recordGameHistoryOnce(history),
+    resolveRecipeSelection: async (selection) => {
+      if (selection.kind === "PUBLIC") {
+        return (await repository.findPublishedRecipe(selection.recipeId))?.document;
+      }
+      return (await repository.consumePrivateTestToken(selection.token, now()))?.document;
+    },
   });
   try {
     await gameServer.listen(options.port ?? 2567, hostname);

@@ -12,14 +12,13 @@ describe("VoiceSession", () => {
     expect(harness.getUserMedia).not.toHaveBeenCalled();
     expect(harness.sent).toEqual([
       { kind: "READY", targetId: "blind" },
-      { kind: "READY", targetId: "deaf" },
     ]);
     expect(harness.connections).toHaveLength(0);
   });
 
   test("a publisher waits for receiver readiness and uses an explicit sendonly transceiver", async () => {
     const harness = createHarness();
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), true);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), true);
     expect(harness.getUserMedia).not.toHaveBeenCalled();
     await harness.session.enable();
     expect(harness.getUserMedia).toHaveBeenCalledWith({ audio: true });
@@ -34,7 +33,7 @@ describe("VoiceSession", () => {
 
   test("receiver-first READY is cached while disabled, deduped, bounded, and consumed once on enable", async () => {
     const harness = createHarness();
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), true);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), true);
     await harness.session.handleRelay(ready("recipe", "RECIPE_KEEPER"), "room-a");
     await harness.session.handleRelay(ready("recipe", "RECIPE_KEEPER", 2), "room-a");
     await harness.session.handleRelay(ready("blind", "BLIND_COOK", 3), "room-a");
@@ -45,16 +44,15 @@ describe("VoiceSession", () => {
     await harness.session.enable();
     expect(harness.sent.filter((signal) => signal.kind === "OFFER")).toEqual([
       expect.objectContaining({ targetId: "recipe" }),
-      expect.objectContaining({ targetId: "blind" }),
     ]);
-    expect(harness.connections).toHaveLength(2);
+    expect(harness.connections).toHaveLength(1);
   });
 
   test("READY arriving while publisher is enabling is consumed after microphone activation", async () => {
     const harness = createHarness();
     const microphone = deferred<FakeStream>();
     harness.getUserMedia.mockImplementationOnce(() => microphone.promise);
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), true);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), true);
     const enabling = harness.session.enable();
     await harness.session.handleRelay(ready("recipe", "RECIPE_KEEPER"), "room-a");
     expect(harness.connections).toHaveLength(0);
@@ -65,16 +63,16 @@ describe("VoiceSession", () => {
 
   test("cached READY is cleared on not-READY, identity change, and disable", async () => {
     const harness = createHarness();
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), true);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), true);
     await harness.session.handleRelay(ready("recipe", "RECIPE_KEEPER"), "room-a");
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), false);
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), true);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), false);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), true);
     await harness.session.enable();
     expect(harness.sent.filter((signal) => signal.kind === "OFFER")).toHaveLength(0);
 
     harness.session.disable();
     await harness.session.handleRelay(ready("recipe", "RECIPE_KEEPER", 2), "room-a");
-    harness.session.configure("room-b", "deaf-2", { canPublish: true, canReceive: false }, peers(), true);
+    harness.session.configure("room-b", "blind-2", { canPublish: true, canReceive: true }, peers(), true);
     await harness.session.enable();
     expect(harness.sent.filter((signal) => signal.kind === "OFFER")).toHaveLength(0);
   });
@@ -83,27 +81,28 @@ describe("VoiceSession", () => {
     const receiver = createHarness();
     receiver.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await receiver.session.enable();
-    await receiver.session.handleRelay(offer("deaf"), "room-a");
+    await receiver.session.handleRelay(offer("blind"), "room-a");
     expect(receiver.connections[0]!.getTransceivers()).toEqual([expect.objectContaining({ direction: "recvonly" })]);
-    expect(receiver.sent).toContainEqual({ kind: "ANSWER", targetId: "deaf", offerId: "offer-1", sdp: RECVONLY_AUDIO_ANSWER_SDP });
+    expect(receiver.sent).toContainEqual({ kind: "ANSWER", targetId: "blind", offerId: "offer-1", sdp: RECVONLY_AUDIO_ANSWER_SDP });
     receiver.connections[0]!.emitTrack(receiver.stream);
     expect(receiver.audio.srcObject).toBe(receiver.stream);
 
-    const senderOnly = createHarness();
-    senderOnly.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), true);
-    await senderOnly.session.enable();
-    await senderOnly.session.handleRelay(offer("blind"), "room-a");
-    senderOnly.connections[0]?.emitTrack(senderOnly.stream);
-    expect(senderOnly.createAudio).not.toHaveBeenCalled();
+    const silentGuide = createHarness();
+    silentGuide.session.configure("room-a", "deaf", { canPublish: false, canReceive: false }, peers(), true);
+    await silentGuide.session.enable();
+    await silentGuide.session.handleRelay(offer("blind"), "room-a");
+    expect(silentGuide.connections).toHaveLength(0);
+    expect(silentGuide.getUserMedia).not.toHaveBeenCalled();
+    expect(silentGuide.createAudio).not.toHaveBeenCalled();
   });
 
   test("publisher enabled before peer arrival negotiates after READY and supersedes a reappearing receiver", async () => {
     const harness = createHarness();
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, [{ id: "deaf", role: "DEAF_KITCHEN_GUIDE" }], false);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, [{ id: "blind", role: "BLIND_COOK" }], false);
     await harness.session.enable();
     expect(harness.getUserMedia).not.toHaveBeenCalled();
 
-    harness.session.configure("room-a", "deaf", { canPublish: true, canReceive: false }, peers(), true);
+    harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), true);
     await vi.waitFor(() => expect(harness.getUserMedia).toHaveBeenCalledTimes(1));
     await harness.session.handleRelay(ready("recipe", "RECIPE_KEEPER"), "room-a");
     const original = harness.connections[0]!;
@@ -124,7 +123,7 @@ describe("VoiceSession", () => {
     expect(harness.stream.track.stop).toHaveBeenCalled();
     harness.session.configure("room-a", "blind", { canPublish: true, canReceive: true }, peers(), true);
     await vi.waitFor(() => expect(harness.getUserMedia).toHaveBeenCalledTimes(2));
-    expect(harness.sent.filter((signal) => signal.kind === "READY").length).toBeGreaterThanOrEqual(2);
+    expect(harness.sent.filter((signal) => signal.kind === "READY")).toHaveLength(0);
   });
 
   test("out-of-order ICE has fixed offer/candidate bounds and replacement cleans old peer output", async () => {
@@ -132,14 +131,14 @@ describe("VoiceSession", () => {
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
     for (let index = 0; index < MAX_PENDING_ICE_OFFERS + 2; index += 1) {
-      await harness.session.handleRelay(ice("deaf", `offer-${index}`, `candidate:${index}`), "room-a");
+      await harness.session.handleRelay(ice("blind", `offer-${index}`, `candidate:${index}`), "room-a");
     }
-    await harness.session.handleRelay({ ...offer("deaf"), offerId: "offer-0" }, "room-a");
+    await harness.session.handleRelay({ ...offer("blind"), offerId: "offer-0" }, "room-a");
     expect(harness.connections[0]!.addIceCandidate).not.toHaveBeenCalled();
     harness.connections[0]!.emitTrack(harness.stream);
     const oldAudio = harness.audios[0]!;
-    await harness.session.handleRelay(ice("deaf", `offer-${MAX_PENDING_ICE_OFFERS + 1}`, "candidate:new"), "room-a");
-    await harness.session.handleRelay({ ...offer("deaf"), offerId: `offer-${MAX_PENDING_ICE_OFFERS + 1}` }, "room-a");
+    await harness.session.handleRelay(ice("blind", `offer-${MAX_PENDING_ICE_OFFERS + 1}`, "candidate:new"), "room-a");
+    await harness.session.handleRelay({ ...offer("blind"), offerId: `offer-${MAX_PENDING_ICE_OFFERS + 1}` }, "room-a");
     expect(harness.connections[0]!.close).toHaveBeenCalled();
     expect(oldAudio.pause).toHaveBeenCalled();
     expect(oldAudio.remove).toHaveBeenCalled();
@@ -152,10 +151,10 @@ describe("VoiceSession", () => {
     harness.session.subscribe(() => counts.push(harness.session.remoteStreamCount));
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    await harness.session.handleRelay(offer("deaf"), "room-a");
+    await harness.session.handleRelay(offer("blind"), "room-a");
     harness.connections[0]!.emitTrack(harness.stream);
     expect(harness.session.remoteStreamCount).toBe(1);
-    await harness.session.handleRelay({ ...offer("deaf"), offerId: "offer-2", sequence: 2 }, "room-a");
+    await harness.session.handleRelay({ ...offer("blind"), offerId: "offer-2", sequence: 2 }, "room-a");
     expect(harness.session.remoteStreamCount).toBe(0);
     expect(counts).toEqual(expect.arrayContaining([1, 0]));
   });
@@ -167,7 +166,7 @@ describe("VoiceSession", () => {
     await expect(harness.session.enable()).resolves.toBe(false);
     expect(harness.session.status).toBe("DENIED");
     const count = harness.connections.length;
-    await harness.session.handleRelay(offer("deaf"), "room-b");
+    await harness.session.handleRelay(offer("blind"), "room-b");
     expect(harness.connections).toHaveLength(count);
   });
 
@@ -176,7 +175,7 @@ describe("VoiceSession", () => {
     const harness = createHarness((peer) => peer.setRemoteDescription.mockImplementationOnce(() => gate.promise));
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    const handling = harness.session.handleRelay(offer("deaf"), "room-a");
+    const handling = harness.session.handleRelay(offer("blind"), "room-a");
     await vi.waitFor(() => expect(harness.connections[0]!.setRemoteDescription).toHaveBeenCalled());
     harness.session.disable();
     gate.resolve(undefined);
@@ -193,11 +192,11 @@ describe("VoiceSession", () => {
     const harness = createHarness((peer, index) => { if (index === 0) peer.setRemoteDescription.mockImplementationOnce(() => gate.promise); });
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    const stale = harness.session.handleRelay(offer("deaf"), "room-a");
+    const stale = harness.session.handleRelay(offer("blind"), "room-a");
     await vi.waitFor(() => expect(harness.connections[0]!.setRemoteDescription).toHaveBeenCalled());
     harness.session.configure("room-b", "recipe-2", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    await harness.session.handleRelay({ ...offer("deaf"), offerId: "offer-new" }, "room-b");
+    await harness.session.handleRelay({ ...offer("blind"), offerId: "offer-new" }, "room-b");
     const newer = harness.connections[1]!;
     gate.resolve(undefined);
     await stale;
@@ -211,11 +210,11 @@ describe("VoiceSession", () => {
     const harness = createHarness((peer, index) => { if (index === 0) peer.createAnswer.mockImplementationOnce(() => gate.promise); });
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    const stale = harness.session.handleRelay(offer("deaf"), "room-a");
+    const stale = harness.session.handleRelay(offer("blind"), "room-a");
     await vi.waitFor(() => expect(harness.connections[0]!.createAnswer).toHaveBeenCalled());
     harness.session.configure("room-b", "recipe-2", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    await harness.session.handleRelay({ ...offer("deaf"), offerId: "offer-new" }, "room-b");
+    await harness.session.handleRelay({ ...offer("blind"), offerId: "offer-new" }, "room-b");
     const newer = harness.connections[1]!;
     gate.resolve({ type: "answer", sdp: RECVONLY_AUDIO_ANSWER_SDP });
     await stale;
@@ -229,7 +228,7 @@ describe("VoiceSession", () => {
     const harness = createHarness((peer) => peer.createAnswer.mockImplementationOnce(() => gate.promise));
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    const stale = harness.session.handleRelay(offer("deaf"), "room-a");
+    const stale = harness.session.handleRelay(offer("blind"), "room-a");
     await vi.waitFor(() => expect(harness.connections[0]!.createAnswer).toHaveBeenCalled());
     harness.session.disable();
     gate.resolve({ type: "answer", sdp: RECVONLY_AUDIO_ANSWER_SDP });
@@ -242,15 +241,15 @@ describe("VoiceSession", () => {
     const harness = createHarness();
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    await harness.session.handleRelay(offer("deaf"), "room-a");
+    await harness.session.handleRelay(offer("blind"), "room-a");
     const old = harness.connections[0]!;
     const gate = deferred<void>();
     old.addIceCandidate.mockImplementationOnce(() => gate.promise);
-    const stale = harness.session.handleRelay(ice("deaf", "offer-1", "candidate:old"), "room-a");
+    const stale = harness.session.handleRelay(ice("blind", "offer-1", "candidate:old"), "room-a");
     await vi.waitFor(() => expect(old.addIceCandidate).toHaveBeenCalled());
     harness.session.configure("room-b", "recipe-2", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    await harness.session.handleRelay({ ...offer("deaf"), offerId: "offer-new" }, "room-b");
+    await harness.session.handleRelay({ ...offer("blind"), offerId: "offer-new" }, "room-b");
     const newer = harness.connections[1]!;
     gate.resolve(undefined);
     await stale;
@@ -263,11 +262,11 @@ describe("VoiceSession", () => {
     const harness = createHarness();
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    await harness.session.handleRelay(offer("deaf"), "room-a");
+    await harness.session.handleRelay(offer("blind"), "room-a");
     const old = harness.connections[0]!;
     const gate = deferred<void>();
     old.addIceCandidate.mockImplementationOnce(() => gate.promise);
-    const stale = harness.session.handleRelay(ice("deaf", "offer-1", "candidate:old"), "room-a");
+    const stale = harness.session.handleRelay(ice("blind", "offer-1", "candidate:old"), "room-a");
     await vi.waitFor(() => expect(old.addIceCandidate).toHaveBeenCalled());
     harness.session.disable();
     gate.resolve(undefined);
@@ -280,11 +279,11 @@ describe("VoiceSession", () => {
     const harness = createHarness();
     harness.session.configure("room-a", "recipe", { canPublish: false, canReceive: true }, peers(), true);
     await harness.session.enable();
-    await harness.session.handleRelay(offer("deaf"), "room-a");
+    await harness.session.handleRelay(offer("blind"), "room-a");
     const peer = harness.connections[0]!;
-    await harness.session.handleRelay({ ...relay("unknown", "DEAF_KITCHEN_GUIDE", 2), kind: "DISABLED" }, "room-a");
+    await harness.session.handleRelay({ ...relay("unknown", "BLIND_COOK", 2), kind: "DISABLED" }, "room-a");
     expect(peer.close).not.toHaveBeenCalled();
-    await harness.session.handleRelay({ ...relay("deaf", "DEAF_KITCHEN_GUIDE", 3), kind: "DISABLED" }, "room-a");
+    await harness.session.handleRelay({ ...relay("blind", "BLIND_COOK", 3), kind: "DISABLED" }, "room-a");
     expect(peer.close).toHaveBeenCalled();
   });
 
@@ -322,7 +321,7 @@ function offer(senderId: string): VoiceRelayEnvelope {
   return { ...relay(senderId, senderId === "deaf" ? "DEAF_KITCHEN_GUIDE" : "BLIND_COOK"), kind: "OFFER", offerId: "offer-1", sdp: SENDONLY_AUDIO_OFFER_SDP };
 }
 function ice(senderId: string, offerId: string, candidate: string): VoiceRelayEnvelope {
-  return { ...relay(senderId, "DEAF_KITCHEN_GUIDE"), kind: "ICE", offerId, candidate };
+  return { ...relay(senderId, senderId === "blind" ? "BLIND_COOK" : "DEAF_KITCHEN_GUIDE"), kind: "ICE", offerId, candidate };
 }
 
 class FakeTrack { kind = "audio"; stop = vi.fn(); }

@@ -44,6 +44,7 @@ export type GameHistoryMinAggregateOutputType = {
   roundId: string | null
   roomId: string | null
   recipeId: string | null
+  recipeSnapshotJson: string | null
   outcome: string | null
   outcomeReason: string | null
   completedStepCount: number | null
@@ -59,6 +60,7 @@ export type GameHistoryMaxAggregateOutputType = {
   roundId: string | null
   roomId: string | null
   recipeId: string | null
+  recipeSnapshotJson: string | null
   outcome: string | null
   outcomeReason: string | null
   completedStepCount: number | null
@@ -74,6 +76,7 @@ export type GameHistoryCountAggregateOutputType = {
   roundId: number
   roomId: number
   recipeId: number
+  recipeSnapshotJson: number
   outcome: number
   outcomeReason: number
   completedStepCount: number
@@ -103,6 +106,7 @@ export type GameHistoryMinAggregateInputType = {
   roundId?: true
   roomId?: true
   recipeId?: true
+  recipeSnapshotJson?: true
   outcome?: true
   outcomeReason?: true
   completedStepCount?: true
@@ -118,6 +122,7 @@ export type GameHistoryMaxAggregateInputType = {
   roundId?: true
   roomId?: true
   recipeId?: true
+  recipeSnapshotJson?: true
   outcome?: true
   outcomeReason?: true
   completedStepCount?: true
@@ -133,6 +138,7 @@ export type GameHistoryCountAggregateInputType = {
   roundId?: true
   roomId?: true
   recipeId?: true
+  recipeSnapshotJson?: true
   outcome?: true
   outcomeReason?: true
   completedStepCount?: true
@@ -235,6 +241,7 @@ export type GameHistoryGroupByOutputType = {
   roundId: string
   roomId: string
   recipeId: string
+  recipeSnapshotJson: string | null
   outcome: string
   outcomeReason: string
   completedStepCount: number
@@ -273,6 +280,7 @@ export type GameHistoryWhereInput = {
   roundId?: Prisma.StringFilter<"GameHistory"> | string
   roomId?: Prisma.StringFilter<"GameHistory"> | string
   recipeId?: Prisma.StringFilter<"GameHistory"> | string
+  recipeSnapshotJson?: Prisma.StringNullableFilter<"GameHistory"> | string | null
   outcome?: Prisma.StringFilter<"GameHistory"> | string
   outcomeReason?: Prisma.StringFilter<"GameHistory"> | string
   completedStepCount?: Prisma.IntFilter<"GameHistory"> | number
@@ -289,6 +297,7 @@ export type GameHistoryOrderByWithRelationInput = {
   roundId?: Prisma.SortOrder
   roomId?: Prisma.SortOrder
   recipeId?: Prisma.SortOrder
+  recipeSnapshotJson?: Prisma.SortOrderInput | Prisma.SortOrder
   outcome?: Prisma.SortOrder
   outcomeReason?: Prisma.SortOrder
   completedStepCount?: Prisma.SortOrder
@@ -309,6 +318,7 @@ export type GameHistoryWhereUniqueInput = Prisma.AtLeast<{
   roundId?: Prisma.StringFilter<"GameHistory"> | string
   roomId?: Prisma.StringFilter<"GameHistory"> | string
   recipeId?: Prisma.StringFilter<"GameHistory"> | string
+  recipeSnapshotJson?: Prisma.StringNullableFilter<"GameHistory"> | string | null
   outcome?: Prisma.StringFilter<"GameHistory"> | string
   outcomeReason?: Prisma.StringFilter<"GameHistory"> | string
   completedStepCount?: Prisma.IntFilter<"GameHistory"> | number
@@ -325,6 +335,7 @@ export type GameHistoryOrderByWithAggregationInput = {
   roundId?: Prisma.SortOrder
   roomId?: Prisma.SortOrder
   recipeId?: Prisma.SortOrder
+  recipeSnapshotJson?: Prisma.SortOrderInput | Prisma.SortOrder
   outcome?: Prisma.SortOrder
   outcomeReason?: Prisma.SortOrder
   completedStepCount?: Prisma.SortOrder
@@ -348,6 +359,7 @@ export type GameHistoryScalarWhereWithAggregatesInput = {
   roundId?: Prisma.StringWithAggregatesFilter<"GameHistory"> | string
   roomId?: Prisma.StringWithAggregatesFilter<"GameHistory"> | string
   recipeId?: Prisma.StringWithAggregatesFilter<"GameHistory"> | string
+  recipeSnapshotJson?: Prisma.StringNullableWithAggregatesFilter<"GameHistory"> | string | null
   outcome?: Prisma.StringWithAggregatesFilter<"GameHistory"> | string
   outcomeReason?: Prisma.StringWithAggregatesFilter<"GameHistory"> | string
   completedStepCount?: Prisma.IntWithAggregatesFilter<"GameHistory"> | number
@@ -362,6 +374,7 @@ export type GameHistoryCreateInput = {
   roundId: string
   roomId: string
   recipeId: string
+  recipeSnapshotJson?: string | null
   outcome: string
   outcomeReason: string
   completedStepCount: number
@@ -378,6 +391,7 @@ export type GameHistoryUncheckedCreateInput = {
   roundId: string
   roomId: string
   recipeId: string
+  recipeSnapshotJson?: string | null
   outcome: string
   outcomeReason: string
   completedStepCount: number
@@ -392,6 +406,7 @@ export type GameHistoryUpdateInput = {
   roundId?: Prisma.StringFieldUpdateOperationsInput | string
   roomId?: Prisma.StringFieldUpdateOperationsInput | string
   recipeId?: Prisma.StringFieldUpdateOperationsInput | string
+  recipeSnapshotJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outcome?: Prisma.StringFieldUpdateOperationsInput | string
   outcomeReason?: Prisma.StringFieldUpdateOperationsInput | string
   completedStepCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -408,6 +423,7 @@ export type GameHistoryUncheckedUpdateInput = {
   roundId?: Prisma.StringFieldUpdateOperationsInput | string
   roomId?: Prisma.StringFieldUpdateOperationsInput | string
   recipeId?: Prisma.StringFieldUpdateOperationsInput | string
+  recipeSnapshotJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outcome?: Prisma.StringFieldUpdateOperationsInput | string
   outcomeReason?: Prisma.StringFieldUpdateOperationsInput | string
   completedStepCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -423,6 +439,7 @@ export type GameHistoryCreateManyInput = {
   roundId: string
   roomId: string
   recipeId: string
+  recipeSnapshotJson?: string | null
   outcome: string
   outcomeReason: string
   completedStepCount: number
@@ -437,6 +454,7 @@ export type GameHistoryUpdateManyMutationInput = {
   roundId?: Prisma.StringFieldUpdateOperationsInput | string
   roomId?: Prisma.StringFieldUpdateOperationsInput | string
   recipeId?: Prisma.StringFieldUpdateOperationsInput | string
+  recipeSnapshotJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outcome?: Prisma.StringFieldUpdateOperationsInput | string
   outcomeReason?: Prisma.StringFieldUpdateOperationsInput | string
   completedStepCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -452,6 +470,7 @@ export type GameHistoryUncheckedUpdateManyInput = {
   roundId?: Prisma.StringFieldUpdateOperationsInput | string
   roomId?: Prisma.StringFieldUpdateOperationsInput | string
   recipeId?: Prisma.StringFieldUpdateOperationsInput | string
+  recipeSnapshotJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outcome?: Prisma.StringFieldUpdateOperationsInput | string
   outcomeReason?: Prisma.StringFieldUpdateOperationsInput | string
   completedStepCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -482,6 +501,7 @@ export type GameHistoryCountOrderByAggregateInput = {
   roundId?: Prisma.SortOrder
   roomId?: Prisma.SortOrder
   recipeId?: Prisma.SortOrder
+  recipeSnapshotJson?: Prisma.SortOrder
   outcome?: Prisma.SortOrder
   outcomeReason?: Prisma.SortOrder
   completedStepCount?: Prisma.SortOrder
@@ -503,6 +523,7 @@ export type GameHistoryMaxOrderByAggregateInput = {
   roundId?: Prisma.SortOrder
   roomId?: Prisma.SortOrder
   recipeId?: Prisma.SortOrder
+  recipeSnapshotJson?: Prisma.SortOrder
   outcome?: Prisma.SortOrder
   outcomeReason?: Prisma.SortOrder
   completedStepCount?: Prisma.SortOrder
@@ -518,6 +539,7 @@ export type GameHistoryMinOrderByAggregateInput = {
   roundId?: Prisma.SortOrder
   roomId?: Prisma.SortOrder
   recipeId?: Prisma.SortOrder
+  recipeSnapshotJson?: Prisma.SortOrder
   outcome?: Prisma.SortOrder
   outcomeReason?: Prisma.SortOrder
   completedStepCount?: Prisma.SortOrder
@@ -575,11 +597,16 @@ export type GameHistoryUncheckedUpdateManyWithoutAccountNestedInput = {
   deleteMany?: Prisma.GameHistoryScalarWhereInput | Prisma.GameHistoryScalarWhereInput[]
 }
 
+export type NullableStringFieldUpdateOperationsInput = {
+  set?: string | null
+}
+
 export type GameHistoryCreateWithoutAccountInput = {
   id?: string
   roundId: string
   roomId: string
   recipeId: string
+  recipeSnapshotJson?: string | null
   outcome: string
   outcomeReason: string
   completedStepCount: number
@@ -594,6 +621,7 @@ export type GameHistoryUncheckedCreateWithoutAccountInput = {
   roundId: string
   roomId: string
   recipeId: string
+  recipeSnapshotJson?: string | null
   outcome: string
   outcomeReason: string
   completedStepCount: number
@@ -637,6 +665,7 @@ export type GameHistoryScalarWhereInput = {
   roundId?: Prisma.StringFilter<"GameHistory"> | string
   roomId?: Prisma.StringFilter<"GameHistory"> | string
   recipeId?: Prisma.StringFilter<"GameHistory"> | string
+  recipeSnapshotJson?: Prisma.StringNullableFilter<"GameHistory"> | string | null
   outcome?: Prisma.StringFilter<"GameHistory"> | string
   outcomeReason?: Prisma.StringFilter<"GameHistory"> | string
   completedStepCount?: Prisma.IntFilter<"GameHistory"> | number
@@ -651,6 +680,7 @@ export type GameHistoryCreateManyAccountInput = {
   roundId: string
   roomId: string
   recipeId: string
+  recipeSnapshotJson?: string | null
   outcome: string
   outcomeReason: string
   completedStepCount: number
@@ -665,6 +695,7 @@ export type GameHistoryUpdateWithoutAccountInput = {
   roundId?: Prisma.StringFieldUpdateOperationsInput | string
   roomId?: Prisma.StringFieldUpdateOperationsInput | string
   recipeId?: Prisma.StringFieldUpdateOperationsInput | string
+  recipeSnapshotJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outcome?: Prisma.StringFieldUpdateOperationsInput | string
   outcomeReason?: Prisma.StringFieldUpdateOperationsInput | string
   completedStepCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -679,6 +710,7 @@ export type GameHistoryUncheckedUpdateWithoutAccountInput = {
   roundId?: Prisma.StringFieldUpdateOperationsInput | string
   roomId?: Prisma.StringFieldUpdateOperationsInput | string
   recipeId?: Prisma.StringFieldUpdateOperationsInput | string
+  recipeSnapshotJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outcome?: Prisma.StringFieldUpdateOperationsInput | string
   outcomeReason?: Prisma.StringFieldUpdateOperationsInput | string
   completedStepCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -693,6 +725,7 @@ export type GameHistoryUncheckedUpdateManyWithoutAccountInput = {
   roundId?: Prisma.StringFieldUpdateOperationsInput | string
   roomId?: Prisma.StringFieldUpdateOperationsInput | string
   recipeId?: Prisma.StringFieldUpdateOperationsInput | string
+  recipeSnapshotJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   outcome?: Prisma.StringFieldUpdateOperationsInput | string
   outcomeReason?: Prisma.StringFieldUpdateOperationsInput | string
   completedStepCount?: Prisma.IntFieldUpdateOperationsInput | number
@@ -710,6 +743,7 @@ export type GameHistorySelect<ExtArgs extends runtime.Types.Extensions.InternalA
   roundId?: boolean
   roomId?: boolean
   recipeId?: boolean
+  recipeSnapshotJson?: boolean
   outcome?: boolean
   outcomeReason?: boolean
   completedStepCount?: boolean
@@ -726,6 +760,7 @@ export type GameHistorySelectCreateManyAndReturn<ExtArgs extends runtime.Types.E
   roundId?: boolean
   roomId?: boolean
   recipeId?: boolean
+  recipeSnapshotJson?: boolean
   outcome?: boolean
   outcomeReason?: boolean
   completedStepCount?: boolean
@@ -742,6 +777,7 @@ export type GameHistorySelectUpdateManyAndReturn<ExtArgs extends runtime.Types.E
   roundId?: boolean
   roomId?: boolean
   recipeId?: boolean
+  recipeSnapshotJson?: boolean
   outcome?: boolean
   outcomeReason?: boolean
   completedStepCount?: boolean
@@ -758,6 +794,7 @@ export type GameHistorySelectScalar = {
   roundId?: boolean
   roomId?: boolean
   recipeId?: boolean
+  recipeSnapshotJson?: boolean
   outcome?: boolean
   outcomeReason?: boolean
   completedStepCount?: boolean
@@ -767,7 +804,7 @@ export type GameHistorySelectScalar = {
   createdAt?: boolean
 }
 
-export type GameHistoryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "accountId" | "roundId" | "roomId" | "recipeId" | "outcome" | "outcomeReason" | "completedStepCount" | "totalStepCount" | "durationMs" | "finishedAt" | "createdAt", ExtArgs["result"]["gameHistory"]>
+export type GameHistoryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "accountId" | "roundId" | "roomId" | "recipeId" | "recipeSnapshotJson" | "outcome" | "outcomeReason" | "completedStepCount" | "totalStepCount" | "durationMs" | "finishedAt" | "createdAt", ExtArgs["result"]["gameHistory"]>
 export type GameHistoryInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   account?: boolean | Prisma.AccountDefaultArgs<ExtArgs>
 }
@@ -789,6 +826,7 @@ export type $GameHistoryPayload<ExtArgs extends runtime.Types.Extensions.Interna
     roundId: string
     roomId: string
     recipeId: string
+    recipeSnapshotJson: string | null
     outcome: string
     outcomeReason: string
     completedStepCount: number
@@ -1225,6 +1263,7 @@ export interface GameHistoryFieldRefs {
   readonly roundId: Prisma.FieldRef<"GameHistory", 'String'>
   readonly roomId: Prisma.FieldRef<"GameHistory", 'String'>
   readonly recipeId: Prisma.FieldRef<"GameHistory", 'String'>
+  readonly recipeSnapshotJson: Prisma.FieldRef<"GameHistory", 'String'>
   readonly outcome: Prisma.FieldRef<"GameHistory", 'String'>
   readonly outcomeReason: Prisma.FieldRef<"GameHistory", 'String'>
   readonly completedStepCount: Prisma.FieldRef<"GameHistory", 'Int'>

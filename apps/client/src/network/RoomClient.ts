@@ -32,6 +32,7 @@ import {
   type KitchenObjectKind,
   type KitchenObjectLocation,
   type KitchenObjectPreparation,
+  type KitchenJoinOptions,
   type KitchenRoomState,
   type PlayerRole,
   type PrivateRecipePayload,
@@ -91,7 +92,10 @@ export interface LobbyObjectSnapshot {
 }
 
 export interface LobbyConnection {
-  create(displayName: string): Promise<void>;
+  create(
+    displayName: string,
+    selection?: { recipeId?: string; recipeTestToken?: string },
+  ): Promise<void>;
   join(roomId: string, displayName: string): Promise<void>;
   resume(): Promise<boolean>;
   pickUp(objectId: string): void;
@@ -136,7 +140,7 @@ export interface RoomClientRoom {
 export interface RoomClientTransport {
   create(
     roomName: string,
-    options: { displayName: string },
+    options: KitchenJoinOptions,
   ): Promise<RoomClientRoom>;
   joinById(
     roomId: string,
@@ -194,9 +198,12 @@ export class RoomClient implements LobbyConnection {
     }
   }
 
-  create(displayName: string): Promise<void> {
+  create(
+    displayName: string,
+    selection: { recipeId?: string; recipeTestToken?: string } = {},
+  ): Promise<void> {
     return this.startConnection(() =>
-      this.transport.create(KITCHEN_ROOM_NAME, { displayName }),
+      this.transport.create(KITCHEN_ROOM_NAME, { displayName, ...selection }),
     );
   }
 

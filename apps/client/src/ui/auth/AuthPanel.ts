@@ -1,4 +1,5 @@
 import type { Account, AccountPreferences, AuthGateway } from "../../auth/AuthClient.js";
+import { RecipeStudio, type RecipeLaunchSelection } from "./RecipeStudio.js";
 
 const DEFAULT_PREFERENCES: AccountPreferences = {
   reducedMotion: false,
@@ -14,7 +15,10 @@ export class AuthPanel {
   constructor(
     private readonly root: HTMLElement,
     private readonly gateway: AuthGateway,
-    private readonly options: { onRestoredAccount?(account: Account): void } = {},
+    private readonly options: {
+      onRestoredAccount?(account: Account): void;
+      onLaunchRecipe?(selection: RecipeLaunchSelection, title: string): void;
+    } = {},
   ) {}
 
   mount(): void {
@@ -48,9 +52,18 @@ export class AuthPanel {
           <p class="error" role="alert" hidden></p>
         </form>
         <p class="account-note">Accounts are optional. Guest play remains available.</p>
+        <section data-recipe-discovery-root></section>
       </section>`;
     this.button("register").addEventListener("click", () => void this.register());
     this.button("login").addEventListener("click", () => void this.login());
+    new RecipeStudio(
+      this.root.querySelector<HTMLElement>("[data-recipe-discovery-root]")!,
+      this.gateway,
+      {
+        ownerAccess: false,
+        ...(this.options.onLaunchRecipe ? { onLaunch: this.options.onLaunchRecipe } : {}),
+      },
+    ).mount();
   }
 
   private async register(): Promise<void> {
@@ -107,25 +120,24 @@ export class AuthPanel {
           <button type="button" data-auth-action="save-preferences">Save preferences</button>
         </form>
         <section><h3>Game history</h3><ul data-history></ul></section>
-        <section><h3>Owned recipes</h3><ul data-owned-recipes></ul>
-          <label for="recipe-document">Recipe JSON</label>
-          <textarea id="recipe-document" name="recipeDocument" rows="5"></textarea>
-          <button type="button" data-auth-action="create-recipe">Save recipe</button>
-        </section>
+        <section data-recipe-studio-root></section>
         <p class="error" role="alert" hidden></p>
       </section>`;
     this.root.querySelector<HTMLElement>("[data-authenticated-account]")!.textContent = account.displayName;
     this.button("logout").addEventListener("click", () => void this.logout());
     this.button("save-preferences").addEventListener("click", () => void this.savePreferences());
-    this.button("create-recipe").addEventListener("click", () => void this.createRecipe());
+    new RecipeStudio(
+      this.root.querySelector<HTMLElement>("[data-recipe-studio-root]")!,
+      this.gateway,
+      this.options.onLaunchRecipe ? { onLaunch: this.options.onLaunchRecipe } : {},
+    ).mount();
     try {
-      const [preferences, history, recipes] = await Promise.all([
-        this.gateway.preferences(), this.gateway.history(), this.gateway.recipes(),
+      const [preferences, history] = await Promise.all([
+        this.gateway.preferences(), this.gateway.history(),
       ]);
       if (this.account !== account) return;
       this.renderPreferences(preferences);
       this.renderHistory(history);
-      this.renderRecipes(recipes);
     } catch {
       this.renderPreferences(DEFAULT_PREFERENCES);
       this.showError("Some account data could not be loaded.");
@@ -162,25 +174,6 @@ export class AuthPanel {
     }
   }
 
-  private async createRecipe(): Promise<void> {
-    let document: unknown;
-    try {
-      document = JSON.parse(this.root.querySelector<HTMLTextAreaElement>("[name=recipeDocument]")!.value) as unknown;
-    } catch {
-      return this.showError("Recipe JSON is malformed.");
-    }
-    this.setPending(true);
-    try {
-      await this.gateway.createRecipe(document);
-      this.renderRecipes(await this.gateway.recipes());
-      this.showError();
-    } catch {
-      this.showError("Unable to save recipe. Check the recipe document.");
-    } finally {
-      this.setPending(false);
-    }
-  }
-
   private renderPreferences(preferences: AccountPreferences): void {
     this.checkbox("reducedMotion").checked = preferences.reducedMotion;
     this.checkbox("highContrast").checked = preferences.highContrast;
@@ -193,15 +186,6 @@ export class AuthPanel {
     list.replaceChildren(...history.map((row) => {
       const item = document.createElement("li");
       item.textContent = `${String(row.outcome ?? "Round")} · ${String(row.finishedAt ?? "")}`;
-      return item;
-    }));
-  }
-
-  private renderRecipes(recipes: Array<Record<string, unknown>>): void {
-    const list = this.root.querySelector<HTMLElement>("[data-owned-recipes]")!;
-    list.replaceChildren(...recipes.map((row) => {
-      const item = document.createElement("li");
-      item.textContent = String(row.title ?? "Untitled recipe");
       return item;
     }));
   }

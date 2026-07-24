@@ -20,8 +20,18 @@ export type OwnedRecipeModel = runtime.Types.Result.DefaultSelection<Prisma.$Own
 
 export type AggregateOwnedRecipe = {
   _count: OwnedRecipeCountAggregateOutputType | null
+  _avg: OwnedRecipeAvgAggregateOutputType | null
+  _sum: OwnedRecipeSumAggregateOutputType | null
   _min: OwnedRecipeMinAggregateOutputType | null
   _max: OwnedRecipeMaxAggregateOutputType | null
+}
+
+export type OwnedRecipeAvgAggregateOutputType = {
+  publicationVersion: number | null
+}
+
+export type OwnedRecipeSumAggregateOutputType = {
+  publicationVersion: number | null
 }
 
 export type OwnedRecipeMinAggregateOutputType = {
@@ -29,6 +39,13 @@ export type OwnedRecipeMinAggregateOutputType = {
   accountId: string | null
   title: string | null
   documentJson: string | null
+  publishedDocumentJson: string | null
+  status: $Enums.RecipeStatus | null
+  license: $Enums.RecipeLicense | null
+  publishedAt: Date | null
+  removedAt: Date | null
+  removalReason: string | null
+  publicationVersion: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -38,6 +55,13 @@ export type OwnedRecipeMaxAggregateOutputType = {
   accountId: string | null
   title: string | null
   documentJson: string | null
+  publishedDocumentJson: string | null
+  status: $Enums.RecipeStatus | null
+  license: $Enums.RecipeLicense | null
+  publishedAt: Date | null
+  removedAt: Date | null
+  removalReason: string | null
+  publicationVersion: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -47,17 +71,39 @@ export type OwnedRecipeCountAggregateOutputType = {
   accountId: number
   title: number
   documentJson: number
+  publishedDocumentJson: number
+  status: number
+  license: number
+  publishedAt: number
+  removedAt: number
+  removalReason: number
+  publicationVersion: number
   createdAt: number
   updatedAt: number
   _all: number
 }
 
 
+export type OwnedRecipeAvgAggregateInputType = {
+  publicationVersion?: true
+}
+
+export type OwnedRecipeSumAggregateInputType = {
+  publicationVersion?: true
+}
+
 export type OwnedRecipeMinAggregateInputType = {
   id?: true
   accountId?: true
   title?: true
   documentJson?: true
+  publishedDocumentJson?: true
+  status?: true
+  license?: true
+  publishedAt?: true
+  removedAt?: true
+  removalReason?: true
+  publicationVersion?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -67,6 +113,13 @@ export type OwnedRecipeMaxAggregateInputType = {
   accountId?: true
   title?: true
   documentJson?: true
+  publishedDocumentJson?: true
+  status?: true
+  license?: true
+  publishedAt?: true
+  removedAt?: true
+  removalReason?: true
+  publicationVersion?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -76,6 +129,13 @@ export type OwnedRecipeCountAggregateInputType = {
   accountId?: true
   title?: true
   documentJson?: true
+  publishedDocumentJson?: true
+  status?: true
+  license?: true
+  publishedAt?: true
+  removedAt?: true
+  removalReason?: true
+  publicationVersion?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -119,6 +179,18 @@ export type OwnedRecipeAggregateArgs<ExtArgs extends runtime.Types.Extensions.In
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: OwnedRecipeAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: OwnedRecipeSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: OwnedRecipeMinAggregateInputType
@@ -149,6 +221,8 @@ export type OwnedRecipeGroupByArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   _count?: OwnedRecipeCountAggregateInputType | true
+  _avg?: OwnedRecipeAvgAggregateInputType
+  _sum?: OwnedRecipeSumAggregateInputType
   _min?: OwnedRecipeMinAggregateInputType
   _max?: OwnedRecipeMaxAggregateInputType
 }
@@ -158,9 +232,18 @@ export type OwnedRecipeGroupByOutputType = {
   accountId: string
   title: string
   documentJson: string
+  publishedDocumentJson: string | null
+  status: $Enums.RecipeStatus
+  license: $Enums.RecipeLicense | null
+  publishedAt: Date | null
+  removedAt: Date | null
+  removalReason: string | null
+  publicationVersion: number
   createdAt: Date
   updatedAt: Date
   _count: OwnedRecipeCountAggregateOutputType | null
+  _avg: OwnedRecipeAvgAggregateOutputType | null
+  _sum: OwnedRecipeSumAggregateOutputType | null
   _min: OwnedRecipeMinAggregateOutputType | null
   _max: OwnedRecipeMaxAggregateOutputType | null
 }
@@ -188,9 +271,18 @@ export type OwnedRecipeWhereInput = {
   accountId?: Prisma.StringFilter<"OwnedRecipe"> | string
   title?: Prisma.StringFilter<"OwnedRecipe"> | string
   documentJson?: Prisma.StringFilter<"OwnedRecipe"> | string
+  publishedDocumentJson?: Prisma.StringNullableFilter<"OwnedRecipe"> | string | null
+  status?: Prisma.EnumRecipeStatusFilter<"OwnedRecipe"> | $Enums.RecipeStatus
+  license?: Prisma.EnumRecipeLicenseNullableFilter<"OwnedRecipe"> | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.DateTimeNullableFilter<"OwnedRecipe"> | Date | string | null
+  removedAt?: Prisma.DateTimeNullableFilter<"OwnedRecipe"> | Date | string | null
+  removalReason?: Prisma.StringNullableFilter<"OwnedRecipe"> | string | null
+  publicationVersion?: Prisma.IntFilter<"OwnedRecipe"> | number
   createdAt?: Prisma.DateTimeFilter<"OwnedRecipe"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OwnedRecipe"> | Date | string
   account?: Prisma.XOR<Prisma.AccountScalarRelationFilter, Prisma.AccountWhereInput>
+  reports?: Prisma.RecipeReportListRelationFilter
+  testTokens?: Prisma.RecipeTestTokenListRelationFilter
 }
 
 export type OwnedRecipeOrderByWithRelationInput = {
@@ -198,9 +290,18 @@ export type OwnedRecipeOrderByWithRelationInput = {
   accountId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   documentJson?: Prisma.SortOrder
+  publishedDocumentJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  status?: Prisma.SortOrder
+  license?: Prisma.SortOrderInput | Prisma.SortOrder
+  publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  removedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  removalReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  publicationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   account?: Prisma.AccountOrderByWithRelationInput
+  reports?: Prisma.RecipeReportOrderByRelationAggregateInput
+  testTokens?: Prisma.RecipeTestTokenOrderByRelationAggregateInput
 }
 
 export type OwnedRecipeWhereUniqueInput = Prisma.AtLeast<{
@@ -211,9 +312,18 @@ export type OwnedRecipeWhereUniqueInput = Prisma.AtLeast<{
   accountId?: Prisma.StringFilter<"OwnedRecipe"> | string
   title?: Prisma.StringFilter<"OwnedRecipe"> | string
   documentJson?: Prisma.StringFilter<"OwnedRecipe"> | string
+  publishedDocumentJson?: Prisma.StringNullableFilter<"OwnedRecipe"> | string | null
+  status?: Prisma.EnumRecipeStatusFilter<"OwnedRecipe"> | $Enums.RecipeStatus
+  license?: Prisma.EnumRecipeLicenseNullableFilter<"OwnedRecipe"> | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.DateTimeNullableFilter<"OwnedRecipe"> | Date | string | null
+  removedAt?: Prisma.DateTimeNullableFilter<"OwnedRecipe"> | Date | string | null
+  removalReason?: Prisma.StringNullableFilter<"OwnedRecipe"> | string | null
+  publicationVersion?: Prisma.IntFilter<"OwnedRecipe"> | number
   createdAt?: Prisma.DateTimeFilter<"OwnedRecipe"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OwnedRecipe"> | Date | string
   account?: Prisma.XOR<Prisma.AccountScalarRelationFilter, Prisma.AccountWhereInput>
+  reports?: Prisma.RecipeReportListRelationFilter
+  testTokens?: Prisma.RecipeTestTokenListRelationFilter
 }, "id">
 
 export type OwnedRecipeOrderByWithAggregationInput = {
@@ -221,11 +331,20 @@ export type OwnedRecipeOrderByWithAggregationInput = {
   accountId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   documentJson?: Prisma.SortOrder
+  publishedDocumentJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  status?: Prisma.SortOrder
+  license?: Prisma.SortOrderInput | Prisma.SortOrder
+  publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  removedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  removalReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  publicationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.OwnedRecipeCountOrderByAggregateInput
+  _avg?: Prisma.OwnedRecipeAvgOrderByAggregateInput
   _max?: Prisma.OwnedRecipeMaxOrderByAggregateInput
   _min?: Prisma.OwnedRecipeMinOrderByAggregateInput
+  _sum?: Prisma.OwnedRecipeSumOrderByAggregateInput
 }
 
 export type OwnedRecipeScalarWhereWithAggregatesInput = {
@@ -236,6 +355,13 @@ export type OwnedRecipeScalarWhereWithAggregatesInput = {
   accountId?: Prisma.StringWithAggregatesFilter<"OwnedRecipe"> | string
   title?: Prisma.StringWithAggregatesFilter<"OwnedRecipe"> | string
   documentJson?: Prisma.StringWithAggregatesFilter<"OwnedRecipe"> | string
+  publishedDocumentJson?: Prisma.StringNullableWithAggregatesFilter<"OwnedRecipe"> | string | null
+  status?: Prisma.EnumRecipeStatusWithAggregatesFilter<"OwnedRecipe"> | $Enums.RecipeStatus
+  license?: Prisma.EnumRecipeLicenseNullableWithAggregatesFilter<"OwnedRecipe"> | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"OwnedRecipe"> | Date | string | null
+  removedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"OwnedRecipe"> | Date | string | null
+  removalReason?: Prisma.StringNullableWithAggregatesFilter<"OwnedRecipe"> | string | null
+  publicationVersion?: Prisma.IntWithAggregatesFilter<"OwnedRecipe"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"OwnedRecipe"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"OwnedRecipe"> | Date | string
 }
@@ -244,9 +370,18 @@ export type OwnedRecipeCreateInput = {
   id?: string
   title: string
   documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   account: Prisma.AccountCreateNestedOneWithoutOwnedRecipesInput
+  reports?: Prisma.RecipeReportCreateNestedManyWithoutRecipeInput
+  testTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutRecipeInput
 }
 
 export type OwnedRecipeUncheckedCreateInput = {
@@ -254,17 +389,35 @@ export type OwnedRecipeUncheckedCreateInput = {
   accountId: string
   title: string
   documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  reports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutRecipeInput
+  testTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutRecipeInput
 }
 
 export type OwnedRecipeUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   account?: Prisma.AccountUpdateOneRequiredWithoutOwnedRecipesNestedInput
+  reports?: Prisma.RecipeReportUpdateManyWithoutRecipeNestedInput
+  testTokens?: Prisma.RecipeTestTokenUpdateManyWithoutRecipeNestedInput
 }
 
 export type OwnedRecipeUncheckedUpdateInput = {
@@ -272,8 +425,17 @@ export type OwnedRecipeUncheckedUpdateInput = {
   accountId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reports?: Prisma.RecipeReportUncheckedUpdateManyWithoutRecipeNestedInput
+  testTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutRecipeNestedInput
 }
 
 export type OwnedRecipeCreateManyInput = {
@@ -281,6 +443,13 @@ export type OwnedRecipeCreateManyInput = {
   accountId: string
   title: string
   documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -289,6 +458,13 @@ export type OwnedRecipeUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -298,6 +474,13 @@ export type OwnedRecipeUncheckedUpdateManyInput = {
   accountId?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -317,8 +500,19 @@ export type OwnedRecipeCountOrderByAggregateInput = {
   accountId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   documentJson?: Prisma.SortOrder
+  publishedDocumentJson?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  license?: Prisma.SortOrder
+  publishedAt?: Prisma.SortOrder
+  removedAt?: Prisma.SortOrder
+  removalReason?: Prisma.SortOrder
+  publicationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type OwnedRecipeAvgOrderByAggregateInput = {
+  publicationVersion?: Prisma.SortOrder
 }
 
 export type OwnedRecipeMaxOrderByAggregateInput = {
@@ -326,6 +520,13 @@ export type OwnedRecipeMaxOrderByAggregateInput = {
   accountId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   documentJson?: Prisma.SortOrder
+  publishedDocumentJson?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  license?: Prisma.SortOrder
+  publishedAt?: Prisma.SortOrder
+  removedAt?: Prisma.SortOrder
+  removalReason?: Prisma.SortOrder
+  publicationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -335,8 +536,24 @@ export type OwnedRecipeMinOrderByAggregateInput = {
   accountId?: Prisma.SortOrder
   title?: Prisma.SortOrder
   documentJson?: Prisma.SortOrder
+  publishedDocumentJson?: Prisma.SortOrder
+  status?: Prisma.SortOrder
+  license?: Prisma.SortOrder
+  publishedAt?: Prisma.SortOrder
+  removedAt?: Prisma.SortOrder
+  removalReason?: Prisma.SortOrder
+  publicationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type OwnedRecipeSumOrderByAggregateInput = {
+  publicationVersion?: Prisma.SortOrder
+}
+
+export type OwnedRecipeScalarRelationFilter = {
+  is?: Prisma.OwnedRecipeWhereInput
+  isNot?: Prisma.OwnedRecipeWhereInput
 }
 
 export type OwnedRecipeCreateNestedManyWithoutAccountInput = {
@@ -381,20 +598,78 @@ export type OwnedRecipeUncheckedUpdateManyWithoutAccountNestedInput = {
   deleteMany?: Prisma.OwnedRecipeScalarWhereInput | Prisma.OwnedRecipeScalarWhereInput[]
 }
 
+export type EnumRecipeStatusFieldUpdateOperationsInput = {
+  set?: $Enums.RecipeStatus
+}
+
+export type NullableEnumRecipeLicenseFieldUpdateOperationsInput = {
+  set?: $Enums.RecipeLicense | null
+}
+
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
+}
+
+export type OwnedRecipeCreateNestedOneWithoutReportsInput = {
+  create?: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutReportsInput, Prisma.OwnedRecipeUncheckedCreateWithoutReportsInput>
+  connectOrCreate?: Prisma.OwnedRecipeCreateOrConnectWithoutReportsInput
+  connect?: Prisma.OwnedRecipeWhereUniqueInput
+}
+
+export type OwnedRecipeUpdateOneRequiredWithoutReportsNestedInput = {
+  create?: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutReportsInput, Prisma.OwnedRecipeUncheckedCreateWithoutReportsInput>
+  connectOrCreate?: Prisma.OwnedRecipeCreateOrConnectWithoutReportsInput
+  upsert?: Prisma.OwnedRecipeUpsertWithoutReportsInput
+  connect?: Prisma.OwnedRecipeWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OwnedRecipeUpdateToOneWithWhereWithoutReportsInput, Prisma.OwnedRecipeUpdateWithoutReportsInput>, Prisma.OwnedRecipeUncheckedUpdateWithoutReportsInput>
+}
+
+export type OwnedRecipeCreateNestedOneWithoutTestTokensInput = {
+  create?: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutTestTokensInput, Prisma.OwnedRecipeUncheckedCreateWithoutTestTokensInput>
+  connectOrCreate?: Prisma.OwnedRecipeCreateOrConnectWithoutTestTokensInput
+  connect?: Prisma.OwnedRecipeWhereUniqueInput
+}
+
+export type OwnedRecipeUpdateOneRequiredWithoutTestTokensNestedInput = {
+  create?: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutTestTokensInput, Prisma.OwnedRecipeUncheckedCreateWithoutTestTokensInput>
+  connectOrCreate?: Prisma.OwnedRecipeCreateOrConnectWithoutTestTokensInput
+  upsert?: Prisma.OwnedRecipeUpsertWithoutTestTokensInput
+  connect?: Prisma.OwnedRecipeWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OwnedRecipeUpdateToOneWithWhereWithoutTestTokensInput, Prisma.OwnedRecipeUpdateWithoutTestTokensInput>, Prisma.OwnedRecipeUncheckedUpdateWithoutTestTokensInput>
+}
+
 export type OwnedRecipeCreateWithoutAccountInput = {
   id?: string
   title: string
   documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  reports?: Prisma.RecipeReportCreateNestedManyWithoutRecipeInput
+  testTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutRecipeInput
 }
 
 export type OwnedRecipeUncheckedCreateWithoutAccountInput = {
   id?: string
   title: string
   documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
+  reports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutRecipeInput
+  testTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutRecipeInput
 }
 
 export type OwnedRecipeCreateOrConnectWithoutAccountInput = {
@@ -430,14 +705,196 @@ export type OwnedRecipeScalarWhereInput = {
   accountId?: Prisma.StringFilter<"OwnedRecipe"> | string
   title?: Prisma.StringFilter<"OwnedRecipe"> | string
   documentJson?: Prisma.StringFilter<"OwnedRecipe"> | string
+  publishedDocumentJson?: Prisma.StringNullableFilter<"OwnedRecipe"> | string | null
+  status?: Prisma.EnumRecipeStatusFilter<"OwnedRecipe"> | $Enums.RecipeStatus
+  license?: Prisma.EnumRecipeLicenseNullableFilter<"OwnedRecipe"> | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.DateTimeNullableFilter<"OwnedRecipe"> | Date | string | null
+  removedAt?: Prisma.DateTimeNullableFilter<"OwnedRecipe"> | Date | string | null
+  removalReason?: Prisma.StringNullableFilter<"OwnedRecipe"> | string | null
+  publicationVersion?: Prisma.IntFilter<"OwnedRecipe"> | number
   createdAt?: Prisma.DateTimeFilter<"OwnedRecipe"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"OwnedRecipe"> | Date | string
+}
+
+export type OwnedRecipeCreateWithoutReportsInput = {
+  id?: string
+  title: string
+  documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  account: Prisma.AccountCreateNestedOneWithoutOwnedRecipesInput
+  testTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutRecipeInput
+}
+
+export type OwnedRecipeUncheckedCreateWithoutReportsInput = {
+  id?: string
+  accountId: string
+  title: string
+  documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  testTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutRecipeInput
+}
+
+export type OwnedRecipeCreateOrConnectWithoutReportsInput = {
+  where: Prisma.OwnedRecipeWhereUniqueInput
+  create: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutReportsInput, Prisma.OwnedRecipeUncheckedCreateWithoutReportsInput>
+}
+
+export type OwnedRecipeUpsertWithoutReportsInput = {
+  update: Prisma.XOR<Prisma.OwnedRecipeUpdateWithoutReportsInput, Prisma.OwnedRecipeUncheckedUpdateWithoutReportsInput>
+  create: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutReportsInput, Prisma.OwnedRecipeUncheckedCreateWithoutReportsInput>
+  where?: Prisma.OwnedRecipeWhereInput
+}
+
+export type OwnedRecipeUpdateToOneWithWhereWithoutReportsInput = {
+  where?: Prisma.OwnedRecipeWhereInput
+  data: Prisma.XOR<Prisma.OwnedRecipeUpdateWithoutReportsInput, Prisma.OwnedRecipeUncheckedUpdateWithoutReportsInput>
+}
+
+export type OwnedRecipeUpdateWithoutReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  account?: Prisma.AccountUpdateOneRequiredWithoutOwnedRecipesNestedInput
+  testTokens?: Prisma.RecipeTestTokenUpdateManyWithoutRecipeNestedInput
+}
+
+export type OwnedRecipeUncheckedUpdateWithoutReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  accountId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  testTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutRecipeNestedInput
+}
+
+export type OwnedRecipeCreateWithoutTestTokensInput = {
+  id?: string
+  title: string
+  documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  account: Prisma.AccountCreateNestedOneWithoutOwnedRecipesInput
+  reports?: Prisma.RecipeReportCreateNestedManyWithoutRecipeInput
+}
+
+export type OwnedRecipeUncheckedCreateWithoutTestTokensInput = {
+  id?: string
+  accountId: string
+  title: string
+  documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  reports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutRecipeInput
+}
+
+export type OwnedRecipeCreateOrConnectWithoutTestTokensInput = {
+  where: Prisma.OwnedRecipeWhereUniqueInput
+  create: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutTestTokensInput, Prisma.OwnedRecipeUncheckedCreateWithoutTestTokensInput>
+}
+
+export type OwnedRecipeUpsertWithoutTestTokensInput = {
+  update: Prisma.XOR<Prisma.OwnedRecipeUpdateWithoutTestTokensInput, Prisma.OwnedRecipeUncheckedUpdateWithoutTestTokensInput>
+  create: Prisma.XOR<Prisma.OwnedRecipeCreateWithoutTestTokensInput, Prisma.OwnedRecipeUncheckedCreateWithoutTestTokensInput>
+  where?: Prisma.OwnedRecipeWhereInput
+}
+
+export type OwnedRecipeUpdateToOneWithWhereWithoutTestTokensInput = {
+  where?: Prisma.OwnedRecipeWhereInput
+  data: Prisma.XOR<Prisma.OwnedRecipeUpdateWithoutTestTokensInput, Prisma.OwnedRecipeUncheckedUpdateWithoutTestTokensInput>
+}
+
+export type OwnedRecipeUpdateWithoutTestTokensInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  account?: Prisma.AccountUpdateOneRequiredWithoutOwnedRecipesNestedInput
+  reports?: Prisma.RecipeReportUpdateManyWithoutRecipeNestedInput
+}
+
+export type OwnedRecipeUncheckedUpdateWithoutTestTokensInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  accountId?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reports?: Prisma.RecipeReportUncheckedUpdateManyWithoutRecipeNestedInput
 }
 
 export type OwnedRecipeCreateManyAccountInput = {
   id?: string
   title: string
   documentJson: string
+  publishedDocumentJson?: string | null
+  status?: $Enums.RecipeStatus
+  license?: $Enums.RecipeLicense | null
+  publishedAt?: Date | string | null
+  removedAt?: Date | string | null
+  removalReason?: string | null
+  publicationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -446,26 +903,89 @@ export type OwnedRecipeUpdateWithoutAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reports?: Prisma.RecipeReportUpdateManyWithoutRecipeNestedInput
+  testTokens?: Prisma.RecipeTestTokenUpdateManyWithoutRecipeNestedInput
 }
 
 export type OwnedRecipeUncheckedUpdateWithoutAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reports?: Prisma.RecipeReportUncheckedUpdateManyWithoutRecipeNestedInput
+  testTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutRecipeNestedInput
 }
 
 export type OwnedRecipeUncheckedUpdateManyWithoutAccountInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   documentJson?: Prisma.StringFieldUpdateOperationsInput | string
+  publishedDocumentJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumRecipeStatusFieldUpdateOperationsInput | $Enums.RecipeStatus
+  license?: Prisma.NullableEnumRecipeLicenseFieldUpdateOperationsInput | $Enums.RecipeLicense | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  removalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publicationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+
+/**
+ * Count Type OwnedRecipeCountOutputType
+ */
+
+export type OwnedRecipeCountOutputType = {
+  reports: number
+  testTokens: number
+}
+
+export type OwnedRecipeCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  reports?: boolean | OwnedRecipeCountOutputTypeCountReportsArgs
+  testTokens?: boolean | OwnedRecipeCountOutputTypeCountTestTokensArgs
+}
+
+/**
+ * OwnedRecipeCountOutputType without action
+ */
+export type OwnedRecipeCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OwnedRecipeCountOutputType
+   */
+  select?: Prisma.OwnedRecipeCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * OwnedRecipeCountOutputType without action
+ */
+export type OwnedRecipeCountOutputTypeCountReportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RecipeReportWhereInput
+}
+
+/**
+ * OwnedRecipeCountOutputType without action
+ */
+export type OwnedRecipeCountOutputTypeCountTestTokensArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RecipeTestTokenWhereInput
+}
 
 
 export type OwnedRecipeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -473,9 +993,19 @@ export type OwnedRecipeSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   accountId?: boolean
   title?: boolean
   documentJson?: boolean
+  publishedDocumentJson?: boolean
+  status?: boolean
+  license?: boolean
+  publishedAt?: boolean
+  removedAt?: boolean
+  removalReason?: boolean
+  publicationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   account?: boolean | Prisma.AccountDefaultArgs<ExtArgs>
+  reports?: boolean | Prisma.OwnedRecipe$reportsArgs<ExtArgs>
+  testTokens?: boolean | Prisma.OwnedRecipe$testTokensArgs<ExtArgs>
+  _count?: boolean | Prisma.OwnedRecipeCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["ownedRecipe"]>
 
 export type OwnedRecipeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -483,6 +1013,13 @@ export type OwnedRecipeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.E
   accountId?: boolean
   title?: boolean
   documentJson?: boolean
+  publishedDocumentJson?: boolean
+  status?: boolean
+  license?: boolean
+  publishedAt?: boolean
+  removedAt?: boolean
+  removalReason?: boolean
+  publicationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   account?: boolean | Prisma.AccountDefaultArgs<ExtArgs>
@@ -493,6 +1030,13 @@ export type OwnedRecipeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.E
   accountId?: boolean
   title?: boolean
   documentJson?: boolean
+  publishedDocumentJson?: boolean
+  status?: boolean
+  license?: boolean
+  publishedAt?: boolean
+  removedAt?: boolean
+  removalReason?: boolean
+  publicationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   account?: boolean | Prisma.AccountDefaultArgs<ExtArgs>
@@ -503,13 +1047,23 @@ export type OwnedRecipeSelectScalar = {
   accountId?: boolean
   title?: boolean
   documentJson?: boolean
+  publishedDocumentJson?: boolean
+  status?: boolean
+  license?: boolean
+  publishedAt?: boolean
+  removedAt?: boolean
+  removalReason?: boolean
+  publicationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type OwnedRecipeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "accountId" | "title" | "documentJson" | "createdAt" | "updatedAt", ExtArgs["result"]["ownedRecipe"]>
+export type OwnedRecipeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "accountId" | "title" | "documentJson" | "publishedDocumentJson" | "status" | "license" | "publishedAt" | "removedAt" | "removalReason" | "publicationVersion" | "createdAt" | "updatedAt", ExtArgs["result"]["ownedRecipe"]>
 export type OwnedRecipeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   account?: boolean | Prisma.AccountDefaultArgs<ExtArgs>
+  reports?: boolean | Prisma.OwnedRecipe$reportsArgs<ExtArgs>
+  testTokens?: boolean | Prisma.OwnedRecipe$testTokensArgs<ExtArgs>
+  _count?: boolean | Prisma.OwnedRecipeCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OwnedRecipeIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   account?: boolean | Prisma.AccountDefaultArgs<ExtArgs>
@@ -522,12 +1076,21 @@ export type $OwnedRecipePayload<ExtArgs extends runtime.Types.Extensions.Interna
   name: "OwnedRecipe"
   objects: {
     account: Prisma.$AccountPayload<ExtArgs>
+    reports: Prisma.$RecipeReportPayload<ExtArgs>[]
+    testTokens: Prisma.$RecipeTestTokenPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     accountId: string
     title: string
     documentJson: string
+    publishedDocumentJson: string | null
+    status: $Enums.RecipeStatus
+    license: $Enums.RecipeLicense | null
+    publishedAt: Date | null
+    removedAt: Date | null
+    removalReason: string | null
+    publicationVersion: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["ownedRecipe"]>
@@ -925,6 +1488,8 @@ readonly fields: OwnedRecipeFieldRefs;
 export interface Prisma__OwnedRecipeClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   account<T extends Prisma.AccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AccountDefaultArgs<ExtArgs>>): Prisma.Prisma__AccountClient<runtime.Types.Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  reports<T extends Prisma.OwnedRecipe$reportsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OwnedRecipe$reportsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RecipeReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  testTokens<T extends Prisma.OwnedRecipe$testTokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OwnedRecipe$testTokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RecipeTestTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -958,6 +1523,13 @@ export interface OwnedRecipeFieldRefs {
   readonly accountId: Prisma.FieldRef<"OwnedRecipe", 'String'>
   readonly title: Prisma.FieldRef<"OwnedRecipe", 'String'>
   readonly documentJson: Prisma.FieldRef<"OwnedRecipe", 'String'>
+  readonly publishedDocumentJson: Prisma.FieldRef<"OwnedRecipe", 'String'>
+  readonly status: Prisma.FieldRef<"OwnedRecipe", 'RecipeStatus'>
+  readonly license: Prisma.FieldRef<"OwnedRecipe", 'RecipeLicense'>
+  readonly publishedAt: Prisma.FieldRef<"OwnedRecipe", 'DateTime'>
+  readonly removedAt: Prisma.FieldRef<"OwnedRecipe", 'DateTime'>
+  readonly removalReason: Prisma.FieldRef<"OwnedRecipe", 'String'>
+  readonly publicationVersion: Prisma.FieldRef<"OwnedRecipe", 'Int'>
   readonly createdAt: Prisma.FieldRef<"OwnedRecipe", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"OwnedRecipe", 'DateTime'>
 }
@@ -1356,6 +1928,54 @@ export type OwnedRecipeDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Limit how many OwnedRecipes to delete.
    */
   limit?: number
+}
+
+/**
+ * OwnedRecipe.reports
+ */
+export type OwnedRecipe$reportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RecipeReport
+   */
+  select?: Prisma.RecipeReportSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RecipeReport
+   */
+  omit?: Prisma.RecipeReportOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RecipeReportInclude<ExtArgs> | null
+  where?: Prisma.RecipeReportWhereInput
+  orderBy?: Prisma.RecipeReportOrderByWithRelationInput | Prisma.RecipeReportOrderByWithRelationInput[]
+  cursor?: Prisma.RecipeReportWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RecipeReportScalarFieldEnum | Prisma.RecipeReportScalarFieldEnum[]
+}
+
+/**
+ * OwnedRecipe.testTokens
+ */
+export type OwnedRecipe$testTokensArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RecipeTestToken
+   */
+  select?: Prisma.RecipeTestTokenSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RecipeTestToken
+   */
+  omit?: Prisma.RecipeTestTokenOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RecipeTestTokenInclude<ExtArgs> | null
+  where?: Prisma.RecipeTestTokenWhereInput
+  orderBy?: Prisma.RecipeTestTokenOrderByWithRelationInput | Prisma.RecipeTestTokenOrderByWithRelationInput[]
+  cursor?: Prisma.RecipeTestTokenWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RecipeTestTokenScalarFieldEnum | Prisma.RecipeTestTokenScalarFieldEnum[]
 }
 
 /**

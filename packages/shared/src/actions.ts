@@ -76,7 +76,7 @@ export const roundReadySchema = strictObject({});
 export type CookingErrorCode = (typeof COOKING_ERROR_CODES)[number];
 export type CookingErrorPayload = z.infer<typeof cookingErrorSchema>;
 
-export const PRIVATE_RECIPE_IDS = ["tomato-soup"] as const;
+export const MAX_PRIVATE_RECIPE_ID_LENGTH = 64;
 export const MAX_PRIVATE_RECIPE_TITLE_LENGTH = 80;
 export const MAX_PRIVATE_INGREDIENT_COUNT = 16;
 export const MAX_PRIVATE_RECIPE_INGREDIENTS = 16;
@@ -95,8 +95,8 @@ const privateRecipeStepSchema = z.union([
 ]);
 
 export const privateRecipeSchema = strictObject({
-  id: z.literal(PRIVATE_RECIPE_IDS[0]),
-  title: z.literal("Tomato Soup"),
+  id: z.string().min(1).max(MAX_PRIVATE_RECIPE_ID_LENGTH).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+  title: z.string().min(1).max(MAX_PRIVATE_RECIPE_TITLE_LENGTH),
   ingredients: z.array(privateRecipeIngredientSchema).min(1).max(MAX_PRIVATE_RECIPE_INGREDIENTS),
   steps: z.array(privateRecipeStepSchema).min(1).max(MAX_PRIVATE_RECIPE_STEPS),
 });

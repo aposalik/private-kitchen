@@ -1,6 +1,6 @@
 import { type Client, type Room } from "@colyseus/core";
 
-import { TOMATO_SOUP_RECIPE } from "@cooking-game/recipe-schema";
+import type { Recipe } from "@cooking-game/recipe-schema";
 import {
   KITCHEN_MESSAGES,
   parsePrivateRecipe,
@@ -20,15 +20,16 @@ export class RecipeSystem {
   constructor(
     private readonly room: Room,
     private readonly authority: RecipeSystemAuthority,
+    recipe: Recipe,
   ) {
     const kindByIngredientId = new Map(
-      TOMATO_SOUP_RECIPE.ingredients.map((ingredient) => [ingredient.id, ingredient.kind]),
+      recipe.ingredients.map((ingredient) => [ingredient.id, ingredient.kind]),
     );
     this.payload = parsePrivateRecipe({
-      id: TOMATO_SOUP_RECIPE.id,
-      title: TOMATO_SOUP_RECIPE.title,
-      ingredients: TOMATO_SOUP_RECIPE.ingredients.map(({ kind, count }) => ({ kind, count })),
-      steps: TOMATO_SOUP_RECIPE.steps.map((step) =>
+      id: recipe.id,
+      title: recipe.title,
+      ingredients: recipe.ingredients.map(({ kind, count }) => ({ kind, count })),
+      steps: recipe.steps.map((step) =>
         step.ingredientId === undefined
           ? { action: step.action }
           : { action: step.action, ingredientKind: kindByIngredientId.get(step.ingredientId) }

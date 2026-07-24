@@ -8,8 +8,15 @@ import {
 } from "@playwright/test";
 
 const ROLE_LABELS = ["Blind Cook", "Recipe Keeper", "Deaf Kitchen Guide"];
+const ROLE_KEYS: Readonly<Record<string, string>> = {
+  "Blind Cook": "BLIND_COOK",
+  "Recipe Keeper": "RECIPE_KEEPER",
+  "Deaf Kitchen Guide": "DEAF_KITCHEN_GUIDE",
+};
+const PLAYTEST_FEEDBACK_KEY = "cooperative-cooking:phase7:playtest-feedback";
 
 test("three isolated players communicate under exact role policy and a fourth is rejected", async ({ browser }) => {
+  test.setTimeout(90_000);
   const contexts: BrowserContext[] = [];
   try {
     const host = await newPlayerPage(browser, contexts);
@@ -31,6 +38,23 @@ test("three isolated players communicate under exact role policy and a fourth is
 
     const assignedRoles = await Promise.all(players.map((page) => page.locator('[data-field="role"]').textContent()));
     expect(new Set(assignedRoles)).toEqual(new Set(ROLE_LABELS));
+    await Promise.all(players.flatMap((page, index) => [
+      expect(page.locator("#app")).toHaveAttribute("data-connection-state", "CONNECTED"),
+      expect(page.locator("#app")).toHaveAttribute(
+        "data-player-role",
+        ROLE_KEYS[assignedRoles[index] ?? ""]!,
+      ),
+      expect(page.locator("[data-role-briefing]")).toContainText(assignedRoles[index]!),
+      expect(page.locator("[data-role-objective]")).not.toHaveText(""),
+      expect(page.locator("[data-setup-surface]")).toBeHidden(),
+      expect(page.locator("[data-operate-surface]")).toBeVisible(),
+      expect(page.locator("[data-kitchen-stage]")).toBeVisible(),
+      expect(page.locator("[data-kitchen-world] canvas")).toHaveCount(1),
+      expect(page.locator("[data-kitchen-avatar]")).toHaveCount(3),
+    ]));
+    await Promise.all(players.map((page) =>
+      page.locator("[data-role-tools-drawer] > summary").click(),
+    ));
     const blindIndex = assignedRoles.indexOf("Blind Cook");
     const recipeIndex = assignedRoles.indexOf("Recipe Keeper");
     const deafIndex = assignedRoles.indexOf("Deaf Kitchen Guide");
@@ -66,10 +90,12 @@ test("three isolated players communicate under exact role policy and a fourth is
     await Promise.all(players.flatMap((page) => [
       expect(page.locator("[data-gesture]")).toHaveCount(5),
       expect(page.locator("[data-emote]")).toHaveCount(4),
-      expect(page.locator("[data-enable-voice]")).toHaveCount(1),
       expect(page.locator("[data-point-object]")).not.toHaveCount(0),
-      expect(page.locator("[data-point-location]")).toHaveCount(3),
+      expect(page.locator("[data-point-location]")).toHaveCount(5),
     ]));
+    await expect(blindCook.locator("[data-enable-voice]")).toHaveCount(1);
+    await expect(recipeKeeper.locator("[data-enable-voice]")).toHaveCount(1);
+    await expect(deafGuide.locator("[data-enable-voice]")).toHaveCount(0);
     await expect(recipeKeeper.locator("[data-card]")).toHaveCount(9);
     await expect(recipeKeeper.locator('canvas[data-drawing-board][data-editable="true"]')).toHaveCount(1);
     await expect(deafGuide.locator("[data-communication-feed], [data-visual-signal-stage]")).toHaveCount(2);
@@ -79,7 +105,7 @@ test("three isolated players communicate under exact role policy and a fourth is
 
     await expect(blindCook.locator("[data-voice-policy]")).toContainText("Microphone on");
     await expect(recipeKeeper.locator("[data-voice-policy]")).toContainText("Microphone off");
-    await expect(deafGuide.locator("[data-voice-policy]")).toContainText("Voice output off");
+    await expect(deafGuide.locator("[data-voice-policy]")).toHaveText("Microphone off · Voice output off");
 
     const pointObject = blindCook.locator("[data-point-object]").first();
     const pointedObjectId = await pointObject.getAttribute("data-point-object");
@@ -127,23 +153,6 @@ test("three isolated players communicate under exact role policy and a fourth is
     await expect(deafGuide.locator("canvas[data-drawing-board]")).toHaveAttribute("data-stroke-count", "1");
     await expectCountFor(blindCook.locator("canvas[data-drawing-board]"), 0);
 
-    // Receiver-first order proves READY caching before either publisher enables.
-    await recipeKeeper.locator("[data-enable-voice]").click();
-    await blindCook.locator("[data-enable-voice]").click();
-    await deafGuide.locator("[data-enable-voice]").click();
-    await Promise.all(players.map((page) => expect(page.locator("[data-voice-status]")).toHaveText("Enabled")));
-    await Promise.all([
-      expect(recipeKeeper.locator("[data-voice-stream-count]")).toHaveText("Remote streams: 2", { timeout: 15_000 }),
-      expect(blindCook.locator("[data-voice-stream-count]")).toHaveText("Remote streams: 1", { timeout: 15_000 }),
-      expect(deafGuide.locator("[data-voice-stream-count]")).toHaveText("Remote streams: 0", { timeout: 15_000 }),
-    ]);
-    await expectTextFor(deafGuide.locator("[data-voice-stream-count]"), "Remote streams: 0");
-
-    await blindCook.reload();
-    await expect(blindCook.locator('[data-field="role"]')).toHaveText("Blind Cook");
-    await expect(blindCook.locator('[data-field="players"]')).toHaveText("3 / 3");
-    await expect(blindCook.locator('[data-field="status"]')).toHaveText("Ready");
-
     await expect(nonBlind.locator("[data-pick-up], [data-drop]")).toHaveCount(0);
     await expect(nonBlind.locator('[data-field="interaction-guidance"]')).toHaveText("Only the Blind Cook can pick up and drop objects.");
     const pickUp = blindCook.locator("[data-pick-up]").first();
@@ -151,9 +160,12 @@ test("three isolated players communicate under exact role policy and a fourth is
     expect(objectId).toBeTruthy();
     const rows = players.map((page) => page.locator(`[data-object-id="${objectId!}"]`));
     const initialText = await rows[blindIndex]!.textContent();
+    await selectObject(blindCook, objectId!);
+    await expect(pickUp).toBeVisible();
     await pickUp.click();
     await expect(rows[blindIndex]!).toContainText("Held by you");
     await Promise.all(rows.filter((_, index) => index !== blindIndex).map((row) => expect(row).toContainText("Held by another player")));
+    await selectObject(blindCook, objectId!);
     await rows[blindIndex]!.locator("[data-drop]").click();
     await Promise.all(rows.map((row) => expect(row).toContainText("Available")));
     await expect.poll(() => rows[blindIndex]!.textContent()).not.toBe(initialText);
@@ -186,10 +198,13 @@ test("three isolated players communicate under exact role policy and a fourth is
       expect(page.locator("[data-round-status]")).toHaveText("Won"),
       expect(page.locator("[data-round-result]")).toContainText("Round won!"),
       expect(page.locator("[data-round-result]")).toContainText("10 / 10 steps completed"),
+      expect(page.locator("[data-playtest-debrief]")).toBeVisible(),
       expect(page.locator("[data-pick-up], [data-drop], [data-cook-action]")).toHaveCount(0),
     ]));
     for (const page of players) {
-      const pointButtons = page.locator("[data-point-object], [data-point-location]");
+      const pointButtons = page.locator(
+        "button[data-point-object], button[data-point-location]",
+      );
       await expect.poll(async () => {
         const disabled = await pointButtons.evaluateAll((buttons) =>
           buttons.length > 0 && buttons.every((button) => (button as HTMLButtonElement).disabled),
@@ -200,6 +215,55 @@ test("three isolated players communicate under exact role policy and a fourth is
     await expect(recipeKeeper.locator("[data-private-recipe]")).toContainText("Tomato Soup");
     await expectCountFor(blindCook.locator("[data-private-recipe]"), 0);
     await expectCountFor(deafGuide.locator("[data-private-recipe]"), 0);
+
+    // Receiver-first order proves READY caching before the Blind Cook publisher enables.
+    await recipeKeeper.locator("[data-enable-voice]").click();
+    await blindCook.locator("[data-enable-voice]").click();
+    await expect(recipeKeeper.locator("[data-voice-status]")).toHaveText("Enabled");
+    await expect(blindCook.locator("[data-voice-status]")).toHaveText("Enabled");
+    await expect(deafGuide.locator("[data-voice-status]")).toHaveText("Disabled");
+    await Promise.all([
+      expect(recipeKeeper.locator("[data-voice-stream-count]")).toHaveText("Remote streams: 1", { timeout: 15_000 }),
+      expect(blindCook.locator("[data-voice-stream-count]")).toHaveText("Remote streams: 0", { timeout: 15_000 }),
+      expect(deafGuide.locator("[data-voice-stream-count]")).toHaveText("Remote streams: 0", { timeout: 15_000 }),
+    ]);
+    await expectTextFor(deafGuide.locator("[data-voice-stream-count]"), "Remote streams: 0");
+
+    await blindCook.reload();
+    await expect(blindCook.locator('[data-field="role"]')).toHaveText("Blind Cook");
+    await expect(blindCook.locator('[data-field="players"]')).toHaveText("3 / 3");
+    await expect(blindCook.locator('[data-field="status"]')).toHaveText("Ready");
+
+    const localKeysBefore = await blindCook.evaluate(() => Object.keys(localStorage));
+    await blindCook.locator('select[name="participationRating"]').selectOption("5");
+    await blindCook.locator('select[name="communicationClarity"]').selectOption("4");
+    await blindCook.locator('select[name="frustration"]').selectOption("2");
+    await blindCook.locator('select[name="replayIntent"]').selectOption("YES");
+    await blindCook.locator('[name="misunderstoodSignals"][value="NONE"]').check();
+    await blindCook.locator("[data-feedback-submit]").click();
+    await expect(blindCook.locator("[data-feedback-confirmation]")).toContainText("saved locally");
+    const localFeedback = await blindCook.evaluate((feedbackKey) => ({
+      keys: Object.keys(localStorage),
+      records: JSON.parse(localStorage.getItem(feedbackKey) ?? "[]"),
+    }), PLAYTEST_FEEDBACK_KEY);
+    expect(localFeedback.keys.filter((key) => !localKeysBefore.includes(key))).toEqual([
+      PLAYTEST_FEEDBACK_KEY,
+    ]);
+    expect(localFeedback.records).toHaveLength(1);
+    expect(Object.keys(localFeedback.records[0]).sort()).toEqual([
+      "communicationClarity",
+      "completedSteps",
+      "frustration",
+      "misunderstoodSignals",
+      "observedDurationSeconds",
+      "participationRating",
+      "replayIntent",
+      "role",
+      "roundOutcome",
+      "schemaVersion",
+      "timestamp",
+      "totalSteps",
+    ]);
 
     const fourth = await newPlayerPage(browser, contexts);
     await autoJoin(fourth, roomId, "Player Four");
@@ -251,17 +315,19 @@ async function chopIngredient(
     .filter({ hasText: `${label} (` })
     .filter({ hasText: "Raw · Counter · Available" })
     .first();
-  await expect(candidate).toBeVisible();
   const objectId = await candidate.getAttribute("data-object-id");
   expect(objectId).toBeTruthy();
   const row = blindCook.locator(`[data-object-id="${objectId!}"]`);
 
+  await selectObject(blindCook, objectId!);
   await row.locator("[data-pick-up]").click();
   await expect(row).toContainText("Held by you");
+  await selectObject(blindCook, objectId!);
   await row.locator('[data-cook-action="CHOP"]').click();
   await expect(row).toContainText("Chopped · Counter · Held by you");
   completedSteps += 1;
   await expectProgress(players, completedSteps);
+  await selectObject(blindCook, objectId!);
   await row.locator("[data-drop]").click();
   await expect(row).toContainText("Chopped · Counter · Available");
   return { objectId: objectId!, completedSteps };
@@ -274,13 +340,21 @@ async function addIngredientToPot(
   completedSteps: number,
 ): Promise<number> {
   const row = blindCook.locator(`[data-object-id="${objectId}"]`);
+  await selectObject(blindCook, objectId);
   await row.locator("[data-pick-up]").click();
   await expect(row).toContainText("Chopped · Counter · Held by you");
+  await selectObject(blindCook, objectId);
   await row.locator('[data-cook-action="ADD_TO_POT"]').click();
   await expect(row).toContainText("Chopped · Pot · Available");
   completedSteps += 1;
   await expectProgress(players, completedSteps);
   return completedSteps;
+}
+
+async function selectObject(page: Page, objectId: string): Promise<void> {
+  await page.locator(
+    `[data-kitchen-hotspot][data-point-object="${objectId}"]`,
+  ).click();
 }
 
 async function expectProgress(players: readonly Page[], completedSteps: number): Promise<void> {

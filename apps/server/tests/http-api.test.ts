@@ -33,6 +33,7 @@ describe("account HTTP API", () => {
       sessionTtlMs: 60_000,
       scrypt: { cost: 1_024, blockSize: 8, parallelization: 1, keyLength: 32, maxmem: 16 * 1_024 * 1_024 },
       authRateLimit: { attempts: 2, windowMs: 60_000 },
+      moderatorUsernames: ["studio-reporter"],
     });
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -169,6 +170,55 @@ describe("account HTTP API", () => {
     expect((await patch(recipeUrl, { document: { ...TOMATO_SOUP_RECIPE, schemaVersion: 99 } }, ownerCookie)).status).toBe(400);
     expect((await fetch(`${baseUrl}${recipeUrl}`, { method: "DELETE", headers: headers(strangerCookie) })).status).toBe(404);
     expect((await fetch(`${baseUrl}${recipeUrl}`, { method: "DELETE", headers: headers(ownerCookie) })).status).toBe(204);
+  });
+
+  it("supports validated publish, private tests, privacy-safe discovery, reports, and allowlisted removal", async () => {
+    const ownerCookie = await register("studio-owner");
+    const reporterCookie = await register("studio-reporter");
+    const moderatorCookie = reporterCookie;
+    const document = { ...TOMATO_SOUP_RECIPE, id: "summer-soup", title: "Summer Soup" };
+    const created = await post("/api/account/recipes", { document }, ownerCookie);
+    const recipe = (await created.json() as { recipe: { id: string } }).recipe;
+
+    const validation = await post(`/api/account/recipes/${recipe.id}/validate`, {}, ownerCookie);
+    expect(validation.status).toBe(200);
+    expect(await validation.json()).toEqual({ diagnostics: { valid: true, issues: [] } });
+
+    const testSession = await post(`/api/account/recipes/${recipe.id}/test-sessions`, {}, ownerCookie);
+    expect(testSession.status).toBe(201);
+    expect(await testSession.json()).toEqual({
+      recipeTestToken: expect.any(String),
+      expiresAt: expect.any(String),
+    });
+
+    expect((await post(`/api/account/recipes/${recipe.id}/publish`, {}, ownerCookie)).status).toBe(400);
+    expect((await post(`/api/account/recipes/${recipe.id}/publish`, { license: "CC_BY_4_0" }, ownerCookie)).status).toBe(200);
+    expect((await patch(`/api/account/recipes/${recipe.id}`, { document }, ownerCookie)).status).toBe(409);
+
+    const discovery = await get("/api/recipes?query=summer");
+    const discovered = await discovery.json() as { recipes: Array<Record<string, unknown>> };
+    expect(discovered.recipes).toHaveLength(1);
+    expect(discovered.recipes[0]).not.toHaveProperty("document");
+    expect(discovered.recipes[0]).not.toHaveProperty("steps");
+    const detail = await get(`/api/recipes/${recipe.id}`);
+    expect(await detail.json()).not.toHaveProperty("recipe.steps");
+
+    expect((await post(`/api/recipes/${recipe.id}/reports`, {
+      reason: "OTHER", details: "Needs a moderator review.",
+    })).status).toBe(401);
+    expect((await post(`/api/recipes/${recipe.id}/reports`, {
+      reason: "OTHER", details: "Needs a moderator review.",
+    }, reporterCookie)).status).toBe(201);
+    expect((await post(`/api/recipes/${recipe.id}/reports`, {
+      reason: "OTHER", details: "Duplicate report.",
+    }, reporterCookie)).status).toBe(409);
+
+    expect((await get("/api/moderation/recipe-reports", ownerCookie)).status).toBe(403);
+    expect((await get("/api/moderation/recipe-reports", moderatorCookie)).status).toBe(200);
+    expect((await post(`/api/moderation/recipes/${recipe.id}/remove`, {
+      reason: "Policy violation",
+    }, moderatorCookie)).status).toBe(204);
+    expect((await get(`/api/recipes/${recipe.id}`)).status).toBe(404);
   });
 
   function headers(cookie?: string): Record<string, string> {

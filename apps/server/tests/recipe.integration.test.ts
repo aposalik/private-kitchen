@@ -45,7 +45,7 @@ describe("Phase 4 authoritative Tomato Soup round", () => {
     const objects = Array.from(ready.blindCook.state.objects.values());
     expect(objects.filter(({ kind }) => kind === "TOMATO")).toHaveLength(2);
     expect(objects.filter(({ kind }) => kind === "ONION")).toHaveLength(1);
-    expect(objects).toHaveLength(5);
+    expect(objects).toHaveLength(3);
     expect(objects.every(({ preparation, location }) =>
       preparation === "RAW" && location === "COUNTER"
     )).toBe(true);
@@ -159,7 +159,6 @@ describe("Phase 4 authoritative Tomato Soup round", () => {
     const objects = Array.from(ready.blindCook.state.objects.values());
     const tomatoes = objects.filter(({ kind }) => kind === "TOMATO");
     const onion = objects.find(({ kind }) => kind === "ONION")!;
-    const carrot = objects.find(({ kind }) => kind === "CARROT")!;
     let sequence = 0;
 
     await sendCookExpectError(ready.blindCook, {
@@ -178,17 +177,11 @@ describe("Phase 4 authoritative Tomato Soup round", () => {
     await pickUp(ready.blindCook, onion.id);
     await sendCookExpectError(ready.blindCook, {
       action: "ADD_TO_POT", actionSequence: ++sequence, objectId: onion.id,
-    }, "INVALID_PREPARATION");
+    }, "OUT_OF_ORDER");
     await sendCookUntilProgress(ready.blindCook, {
       action: "CHOP", actionSequence: ++sequence, objectId: onion.id,
     }, 2);
     await drop(ready.blindCook, onion.id);
-
-    await pickUp(ready.blindCook, carrot.id);
-    await sendCookExpectError(ready.blindCook, {
-      action: "CHOP", actionSequence: ++sequence, objectId: carrot.id,
-    }, "OUT_OF_ORDER");
-    await drop(ready.blindCook, carrot.id);
 
     await pickUp(ready.blindCook, tomatoes[1]!.id);
     await sendCookUntilProgress(ready.blindCook, {
@@ -246,7 +239,7 @@ describe("Phase 4 authoritative Tomato Soup round", () => {
         ({ kind, preparation }) => kind === "TOMATO" && preparation === "RUINED",
       );
       expect(ruinedTomatoes).toHaveLength(1);
-      expect(currentObjects).toHaveLength(6);
+      expect(currentObjects).toHaveLength(4);
       await sendPickUpExpectError(ready.blindCook, targetId, "OBJECT_UNAVAILABLE");
 
       const replacements = currentObjects.filter(
@@ -272,7 +265,6 @@ describe("Phase 4 authoritative Tomato Soup round", () => {
     const required = allObjects.filter(
       ({ kind }) => kind === "TOMATO" || kind === "ONION",
     );
-    const distractor = allObjects.find(({ kind }) => kind === "CARROT")!;
     let sequence = 0;
 
     for (const object of required) {
@@ -331,8 +323,8 @@ describe("Phase 4 authoritative Tomato Soup round", () => {
     await sendCookExpectError(ready.blindCook, {
       action: "SEASON", actionSequence: ++sequence,
     }, "ROUND_TERMINAL");
-    await sendPickUpExpectError(ready.blindCook, distractor.id, "NOT_READY");
-    expect(ready.blindCook.state.objects.get(distractor.id)?.heldBy).toBe("");
+    await sendPickUpExpectError(ready.blindCook, required[0]!.id, "NOT_READY");
+    expect(ready.blindCook.state.objects.get(required[0]!.id)?.heldBy).toBe("");
     await delay(80);
     expect(ready.blindCook.state).toMatchObject(terminalSnapshot);
     expect(keeperErrors).toEqual([]);
@@ -494,7 +486,7 @@ describe("Phase 4 authoritative Tomato Soup round", () => {
     });
     expect(ready.blindCook.state.remainingMs).toBeLessThanOrEqual(pausedRemaining);
     expect(ready.blindCook.state.remainingMs).toBeGreaterThan(0);
-    expect(ready.blindCook.state.objects.size).toBe(5);
+    expect(ready.blindCook.state.objects.size).toBe(3);
     await waitForState(ready.blindCook, (state) => state.remainingMs < pausedRemaining);
     await delay(80);
     expect(replacementPrivateMessages.get(replacement.sessionId)).toEqual([]);

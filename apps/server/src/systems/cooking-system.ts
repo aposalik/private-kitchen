@@ -1,9 +1,12 @@
 import { type Client, type Room } from "@colyseus/core";
-import { TOMATO_SOUP_RECIPE } from "@cooking-game/recipe-schema";
+import {
+  MAX_TOTAL_INGREDIENT_OBJECTS,
+  type Recipe,
+  type RecipeStep,
+} from "@cooking-game/recipe-schema";
 import {
   KITCHEN_MESSAGES,
   MAX_OBJECT_ID_LENGTH,
-  MAX_ROUND_REMAINING_MS,
   cookActionSchema,
   createInitialKitchenObjects,
   type CookAction,
@@ -15,9 +18,8 @@ import type { KitchenObject, KitchenState } from "../rooms/KitchenRoom.js";
 
 export interface CookingSystemOptions {
   placementSeed: string;
-  roundDurationMs?: number;
+  recipe: Recipe;
   createObject(): KitchenObject;
-  onTerminal?(): void;
   onTerminal?(): void;
 }
 
@@ -27,8 +29,8 @@ export class CookingSystem {
   private started = false;
   private readonly lastActionSequence = new Map<string, number>();
   private readonly creditedChops = new Set<string>();
+  private readonly completedByStep = new Map<string, number>();
   private readonly replacementSequence = new Map<string, number>();
-  private terminalStage = 0;
   private timerInterval: { clear(): void } | undefined;
   private runningStartedAt: number | undefined;
   private remainingAtRunningStart = 0;
@@ -37,9 +39,7 @@ export class CookingSystem {
     private readonly state: KitchenState,
     private readonly options: CookingSystemOptions,
   ) {
-    this.roundDurationMs = validDuration(options.roundDurationMs)
-      ? options.roundDurationMs
-      : TOMATO_SOUP_RECIPE.roundDurationMs;
+    this.roundDurationMs = options.recipe.roundDurationMs;
   }
 
   register(room: Room, roleOf: (sessionId: string) => PlayerRole | undefined): void {
@@ -97,6 +97,7 @@ export class CookingSystem {
     this.remainingAtRunningStart = 0;
     this.lastActionSequence.clear();
     this.creditedChops.clear();
+    this.completedByStep.clear();
     this.replacementSequence.clear();
   }
 
@@ -104,17 +105,14 @@ export class CookingSystem {
     if (!this.started) {
       if (!ready) return;
       this.started = true;
-      this.ensureIngredientCount("TOMATO", 2);
-      this.ensureIngredientCount("ONION", 1);
       this.state.roundStatus = "RUNNING";
       this.state.remainingMs = this.roundDurationMs;
       this.state.completedStepCount = 0;
-      this.state.totalStepCount = TOMATO_SOUP_RECIPE.ingredients.reduce(
-        (total, ingredient) => total + ingredient.count * 2,
-        4,
+      this.state.totalStepCount = this.options.recipe.steps.reduce(
+        (total, step) => total + this.requiredActions(step),
+        0,
       );
       this.state.outcomeReason = "NONE";
-      this.terminalStage = 0;
       this.resumeCountdown();
       return;
     }
@@ -134,28 +132,6 @@ export class CookingSystem {
     }
   }
 
-  private ensureIngredientCount(kind: "TOMATO" | "ONION", required: number): void {
-    let count = Array.from(this.state.objects.values()).filter(
-      (object) => object.kind === kind && object.preparation !== "RUINED",
-    ).length;
-    while (count < required) {
-      const object = this.options.createObject();
-      const initial = createInitialKitchenObjects(
-        `${this.options.placementSeed}:round:${kind}:${count}`,
-      ).find((candidate) => candidate.kind === kind)!;
-      object.id = `round-${kind.toLowerCase()}-${count + 1}`;
-      object.kind = kind;
-      object.label = initial.label;
-      object.x = initial.x;
-      object.y = initial.y;
-      object.heldBy = "";
-      object.preparation = "RAW";
-      object.location = "COUNTER";
-      this.state.objects.set(object.id, object);
-      count += 1;
-    }
-  }
-
   private handleAction(client: Client, action: CookAction): CookingErrorCode | undefined {
     if (action.action !== "CHOP" && action.action !== "ADD_TO_POT") {
       return this.handleTerminalAction(action.action);
@@ -163,57 +139,53 @@ export class CookingSystem {
     const object = this.state.objects.get(action.objectId);
     if (!object) return "OBJECT_NOT_FOUND";
 
-    const requiredCount = TOMATO_SOUP_RECIPE.ingredients.find(
+    const ingredient = this.options.recipe.ingredients.find(
       (ingredient) => ingredient.kind === object.kind,
-    )?.count;
-    if (requiredCount === undefined) return "OUT_OF_ORDER";
+    );
+    if (!ingredient) return "OUT_OF_ORDER";
     if (object.heldBy !== client.sessionId) return "OBJECT_NOT_OWNED";
     if (object.location !== "COUNTER") return "INVALID_PREPARATION";
 
+    const step = this.options.recipe.steps.find((candidate) =>
+      candidate.action === action.action && candidate.ingredientId === ingredient.id
+    );
+    if (!step) return "OUT_OF_ORDER";
+
     if (action.action === "CHOP") {
       if (object.preparation === "RAW") {
+        if (!this.canAdvance(step)) return "OUT_OF_ORDER";
         object.preparation = "CHOPPED";
         this.creditedChops.add(object.id);
-        this.state.completedStepCount += 1;
+        this.advance(step);
         return undefined;
       }
       if (object.preparation === "CHOPPED") {
-        this.ruinAndReplace(object);
+        if (this.hasStartedDependent(step.id)) return "OUT_OF_ORDER";
+        this.ruinAndReplace(object, step.id);
         return undefined;
       }
       return "INVALID_PREPARATION";
     }
 
+    if (!this.canAdvance(step)) return "OUT_OF_ORDER";
     if (object.preparation !== "CHOPPED") return "INVALID_PREPARATION";
-    if (this.state.completedStepCount < this.requiredIngredientTotal()) return "OUT_OF_ORDER";
     const countInPot = Array.from(this.state.objects.values()).filter(
       (candidate) => candidate.kind === object.kind && candidate.location === "POT",
     ).length;
-    if (countInPot >= requiredCount) return "OUT_OF_ORDER";
+    if (countInPot >= ingredient.count) return "OUT_OF_ORDER";
     object.location = "POT";
     object.heldBy = "";
-    this.state.completedStepCount += 1;
+    this.advance(step);
     return undefined;
-  }
-
-  private requiredIngredientTotal(): number {
-    return TOMATO_SOUP_RECIPE.ingredients.reduce(
-      (total, ingredient) => total + ingredient.count,
-      0,
-    );
   }
 
   private handleTerminalAction(
     action: "SEASON" | "BOIL" | "MIX" | "PLATE",
   ): CookingErrorCode | undefined {
-    if (this.state.completedStepCount !== this.requiredIngredientTotal() * 2 + this.terminalStage) {
-      return "OUT_OF_ORDER";
-    }
-    const orderedActions = ["SEASON", "BOIL", "MIX", "PLATE"] as const;
-    if (action !== orderedActions[this.terminalStage]) return "OUT_OF_ORDER";
+    const step = this.options.recipe.steps.find((candidate) => candidate.action === action);
+    if (!step || !this.canAdvance(step)) return "OUT_OF_ORDER";
 
-    this.terminalStage += 1;
-    this.state.completedStepCount += 1;
+    this.advance(step);
     if (action === "PLATE") {
       this.state.roundStatus = "WON";
       this.state.outcomeReason = "COMPLETED";
@@ -221,12 +193,38 @@ export class CookingSystem {
       this.remainingAtRunningStart = this.state.remainingMs;
       this.stopTimerInterval();
       this.options.onTerminal?.();
-      this.options.onTerminal?.();
     }
     return undefined;
   }
 
-  private ruinAndReplace(object: KitchenObject): void {
+  private requiredActions(step: RecipeStep): number {
+    if (step.ingredientId === undefined) return 1;
+    return this.options.recipe.ingredients.find(({ id }) => id === step.ingredientId)?.count ?? 0;
+  }
+
+  private canAdvance(step: RecipeStep): boolean {
+    return (this.completedByStep.get(step.id) ?? 0) < this.requiredActions(step)
+      && step.dependsOn.every((dependency) => this.isStepComplete(dependency));
+  }
+
+  private isStepComplete(stepId: string): boolean {
+    const step = this.options.recipe.steps.find(({ id }) => id === stepId);
+    return step !== undefined
+      && (this.completedByStep.get(stepId) ?? 0) >= this.requiredActions(step);
+  }
+
+  private advance(step: RecipeStep): void {
+    this.completedByStep.set(step.id, (this.completedByStep.get(step.id) ?? 0) + 1);
+    this.state.completedStepCount += 1;
+  }
+
+  private hasStartedDependent(stepId: string): boolean {
+    return this.options.recipe.steps.some((step) =>
+      step.dependsOn.includes(stepId) && (this.completedByStep.get(step.id) ?? 0) > 0
+    );
+  }
+
+  private ruinAndReplace(object: KitchenObject, stepId: string): void {
     for (const candidate of Array.from(this.state.objects.values())) {
       if (
         candidate.id !== object.id
@@ -241,7 +239,15 @@ export class CookingSystem {
     object.location = "COUNTER";
     object.heldBy = "";
     if (this.creditedChops.delete(object.id)) {
+      this.completedByStep.set(
+        stepId,
+        Math.max(0, (this.completedByStep.get(stepId) ?? 0) - 1),
+      );
       this.state.completedStepCount = Math.max(0, this.state.completedStepCount - 1);
+    }
+
+    if (this.state.objects.size >= MAX_TOTAL_INGREDIENT_OBJECTS) {
+      this.state.objects.delete(object.id);
     }
 
     const replacementIndex = (this.replacementSequence.get(object.kind) ?? 0) + 1;
@@ -295,7 +301,6 @@ export class CookingSystem {
       this.remainingAtRunningStart = 0;
       this.stopTimerInterval();
       this.options.onTerminal?.();
-      this.options.onTerminal?.();
     }
   }
 
@@ -303,11 +308,4 @@ export class CookingSystem {
     this.timerInterval?.clear();
     this.timerInterval = undefined;
   }
-}
-
-function validDuration(value: number | undefined): value is number {
-  return typeof value === "number"
-    && Number.isInteger(value)
-    && value > 0
-    && value <= MAX_ROUND_REMAINING_MS;
 }

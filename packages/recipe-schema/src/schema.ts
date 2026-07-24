@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const RECIPE_SCHEMA_VERSION = 1 as const;
-export const RECIPE_IDS = ["tomato-soup"] as const;
 export const INGREDIENT_KINDS = ["TOMATO", "ONION", "CARROT", "POTATO"] as const;
 export const RECIPE_ACTIONS = ["CHOP", "ADD_TO_POT", "SEASON", "BOIL", "MIX", "PLATE"] as const;
 export const DEFAULT_ROUND_DURATION_MS = 300_000;
@@ -12,8 +11,14 @@ export const MAX_RECIPE_TITLE_LENGTH = 80;
 export const MAX_RECIPE_INGREDIENTS = 16;
 export const MAX_RECIPE_STEPS = 64;
 export const MAX_STEP_DEPENDENCIES = 16;
+export const MAX_TOTAL_INGREDIENT_OBJECTS = 16;
 
-const boundedIdSchema = z.string().min(1).max(MAX_RECIPE_ID_LENGTH).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+export const recipeIdSchema = z.string()
+  .min(1)
+  .max(MAX_RECIPE_ID_LENGTH)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+
+const boundedIdSchema = recipeIdSchema;
 
 export const recipeIngredientSchema = z.strictObject({
   id: boundedIdSchema,
@@ -30,14 +35,33 @@ export const recipeStepSchema = z.strictObject({
 
 export const recipeSchema = z.strictObject({
   schemaVersion: z.literal(RECIPE_SCHEMA_VERSION),
-  id: z.enum(RECIPE_IDS),
+  id: recipeIdSchema,
   title: z.string().min(1).max(MAX_RECIPE_TITLE_LENGTH),
   roundDurationMs: z.number().int().min(1).max(MAX_RECIPE_DURATION_MS),
   ingredients: z.array(recipeIngredientSchema).min(1).max(MAX_RECIPE_INGREDIENTS),
   steps: z.array(recipeStepSchema).min(1).max(MAX_RECIPE_STEPS),
 }).superRefine((recipe, context) => {
+  const totalObjects = recipe.ingredients.reduce((total, ingredient) => total + ingredient.count, 0);
+  if (totalObjects > MAX_TOTAL_INGREDIENT_OBJECTS) {
+    context.addIssue({
+      code: "custom",
+      message: `Recipe requires too many physical objects (maximum ${MAX_TOTAL_INGREDIENT_OBJECTS})`,
+      path: ["ingredients"],
+    });
+  }
   addDuplicateIdIssues(recipe.ingredients, "ingredients", context);
   addDuplicateIdIssues(recipe.steps, "steps", context);
+  const ingredientKinds = new Set<string>();
+  recipe.ingredients.forEach((ingredient, index) => {
+    if (ingredientKinds.has(ingredient.kind)) {
+      context.addIssue({
+        code: "custom",
+        message: `Duplicate ingredient kind: ${ingredient.kind}`,
+        path: ["ingredients", index, "kind"],
+      });
+    }
+    ingredientKinds.add(ingredient.kind);
+  });
 
   const ingredientIds = new Set(recipe.ingredients.map(({ id }) => id));
   const stepIds = new Set(recipe.steps.map(({ id }) => id));

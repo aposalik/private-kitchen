@@ -279,6 +279,8 @@ export type AccountWhereInput = {
   sessions?: Prisma.SessionListRelationFilter
   gameHistory?: Prisma.GameHistoryListRelationFilter
   ownedRecipes?: Prisma.OwnedRecipeListRelationFilter
+  recipeReports?: Prisma.RecipeReportListRelationFilter
+  recipeTestTokens?: Prisma.RecipeTestTokenListRelationFilter
 }
 
 export type AccountOrderByWithRelationInput = {
@@ -297,6 +299,8 @@ export type AccountOrderByWithRelationInput = {
   sessions?: Prisma.SessionOrderByRelationAggregateInput
   gameHistory?: Prisma.GameHistoryOrderByRelationAggregateInput
   ownedRecipes?: Prisma.OwnedRecipeOrderByRelationAggregateInput
+  recipeReports?: Prisma.RecipeReportOrderByRelationAggregateInput
+  recipeTestTokens?: Prisma.RecipeTestTokenOrderByRelationAggregateInput
 }
 
 export type AccountWhereUniqueInput = Prisma.AtLeast<{
@@ -318,6 +322,8 @@ export type AccountWhereUniqueInput = Prisma.AtLeast<{
   sessions?: Prisma.SessionListRelationFilter
   gameHistory?: Prisma.GameHistoryListRelationFilter
   ownedRecipes?: Prisma.OwnedRecipeListRelationFilter
+  recipeReports?: Prisma.RecipeReportListRelationFilter
+  recipeTestTokens?: Prisma.RecipeTestTokenListRelationFilter
 }, "id" | "normalizedUsername">
 
 export type AccountOrderByWithAggregationInput = {
@@ -374,6 +380,8 @@ export type AccountCreateInput = {
   sessions?: Prisma.SessionCreateNestedManyWithoutAccountInput
   gameHistory?: Prisma.GameHistoryCreateNestedManyWithoutAccountInput
   ownedRecipes?: Prisma.OwnedRecipeCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountUncheckedCreateInput = {
@@ -392,6 +400,8 @@ export type AccountUncheckedCreateInput = {
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutAccountInput
   gameHistory?: Prisma.GameHistoryUncheckedCreateNestedManyWithoutAccountInput
   ownedRecipes?: Prisma.OwnedRecipeUncheckedCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountUpdateInput = {
@@ -410,6 +420,8 @@ export type AccountUpdateInput = {
   sessions?: Prisma.SessionUpdateManyWithoutAccountNestedInput
   gameHistory?: Prisma.GameHistoryUpdateManyWithoutAccountNestedInput
   ownedRecipes?: Prisma.OwnedRecipeUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUpdateManyWithoutOwnerNestedInput
 }
 
 export type AccountUncheckedUpdateInput = {
@@ -428,6 +440,8 @@ export type AccountUncheckedUpdateInput = {
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutAccountNestedInput
   gameHistory?: Prisma.GameHistoryUncheckedUpdateManyWithoutAccountNestedInput
   ownedRecipes?: Prisma.OwnedRecipeUncheckedUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUncheckedUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutOwnerNestedInput
 }
 
 export type AccountCreateManyInput = {
@@ -597,6 +611,34 @@ export type AccountUpdateOneRequiredWithoutOwnedRecipesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AccountUpdateToOneWithWhereWithoutOwnedRecipesInput, Prisma.AccountUpdateWithoutOwnedRecipesInput>, Prisma.AccountUncheckedUpdateWithoutOwnedRecipesInput>
 }
 
+export type AccountCreateNestedOneWithoutRecipeReportsInput = {
+  create?: Prisma.XOR<Prisma.AccountCreateWithoutRecipeReportsInput, Prisma.AccountUncheckedCreateWithoutRecipeReportsInput>
+  connectOrCreate?: Prisma.AccountCreateOrConnectWithoutRecipeReportsInput
+  connect?: Prisma.AccountWhereUniqueInput
+}
+
+export type AccountUpdateOneRequiredWithoutRecipeReportsNestedInput = {
+  create?: Prisma.XOR<Prisma.AccountCreateWithoutRecipeReportsInput, Prisma.AccountUncheckedCreateWithoutRecipeReportsInput>
+  connectOrCreate?: Prisma.AccountCreateOrConnectWithoutRecipeReportsInput
+  upsert?: Prisma.AccountUpsertWithoutRecipeReportsInput
+  connect?: Prisma.AccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AccountUpdateToOneWithWhereWithoutRecipeReportsInput, Prisma.AccountUpdateWithoutRecipeReportsInput>, Prisma.AccountUncheckedUpdateWithoutRecipeReportsInput>
+}
+
+export type AccountCreateNestedOneWithoutRecipeTestTokensInput = {
+  create?: Prisma.XOR<Prisma.AccountCreateWithoutRecipeTestTokensInput, Prisma.AccountUncheckedCreateWithoutRecipeTestTokensInput>
+  connectOrCreate?: Prisma.AccountCreateOrConnectWithoutRecipeTestTokensInput
+  connect?: Prisma.AccountWhereUniqueInput
+}
+
+export type AccountUpdateOneRequiredWithoutRecipeTestTokensNestedInput = {
+  create?: Prisma.XOR<Prisma.AccountCreateWithoutRecipeTestTokensInput, Prisma.AccountUncheckedCreateWithoutRecipeTestTokensInput>
+  connectOrCreate?: Prisma.AccountCreateOrConnectWithoutRecipeTestTokensInput
+  upsert?: Prisma.AccountUpsertWithoutRecipeTestTokensInput
+  connect?: Prisma.AccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AccountUpdateToOneWithWhereWithoutRecipeTestTokensInput, Prisma.AccountUpdateWithoutRecipeTestTokensInput>, Prisma.AccountUncheckedUpdateWithoutRecipeTestTokensInput>
+}
+
 export type AccountCreateWithoutSessionsInput = {
   id?: string
   username: string
@@ -612,6 +654,8 @@ export type AccountCreateWithoutSessionsInput = {
   updatedAt?: Date | string
   gameHistory?: Prisma.GameHistoryCreateNestedManyWithoutAccountInput
   ownedRecipes?: Prisma.OwnedRecipeCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountUncheckedCreateWithoutSessionsInput = {
@@ -629,6 +673,8 @@ export type AccountUncheckedCreateWithoutSessionsInput = {
   updatedAt?: Date | string
   gameHistory?: Prisma.GameHistoryUncheckedCreateNestedManyWithoutAccountInput
   ownedRecipes?: Prisma.OwnedRecipeUncheckedCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountCreateOrConnectWithoutSessionsInput = {
@@ -662,6 +708,8 @@ export type AccountUpdateWithoutSessionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   gameHistory?: Prisma.GameHistoryUpdateManyWithoutAccountNestedInput
   ownedRecipes?: Prisma.OwnedRecipeUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUpdateManyWithoutOwnerNestedInput
 }
 
 export type AccountUncheckedUpdateWithoutSessionsInput = {
@@ -679,6 +727,8 @@ export type AccountUncheckedUpdateWithoutSessionsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   gameHistory?: Prisma.GameHistoryUncheckedUpdateManyWithoutAccountNestedInput
   ownedRecipes?: Prisma.OwnedRecipeUncheckedUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUncheckedUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutOwnerNestedInput
 }
 
 export type AccountCreateWithoutGameHistoryInput = {
@@ -696,6 +746,8 @@ export type AccountCreateWithoutGameHistoryInput = {
   updatedAt?: Date | string
   sessions?: Prisma.SessionCreateNestedManyWithoutAccountInput
   ownedRecipes?: Prisma.OwnedRecipeCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountUncheckedCreateWithoutGameHistoryInput = {
@@ -713,6 +765,8 @@ export type AccountUncheckedCreateWithoutGameHistoryInput = {
   updatedAt?: Date | string
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutAccountInput
   ownedRecipes?: Prisma.OwnedRecipeUncheckedCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountCreateOrConnectWithoutGameHistoryInput = {
@@ -746,6 +800,8 @@ export type AccountUpdateWithoutGameHistoryInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.SessionUpdateManyWithoutAccountNestedInput
   ownedRecipes?: Prisma.OwnedRecipeUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUpdateManyWithoutOwnerNestedInput
 }
 
 export type AccountUncheckedUpdateWithoutGameHistoryInput = {
@@ -763,6 +819,8 @@ export type AccountUncheckedUpdateWithoutGameHistoryInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutAccountNestedInput
   ownedRecipes?: Prisma.OwnedRecipeUncheckedUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUncheckedUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutOwnerNestedInput
 }
 
 export type AccountCreateWithoutOwnedRecipesInput = {
@@ -780,6 +838,8 @@ export type AccountCreateWithoutOwnedRecipesInput = {
   updatedAt?: Date | string
   sessions?: Prisma.SessionCreateNestedManyWithoutAccountInput
   gameHistory?: Prisma.GameHistoryCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountUncheckedCreateWithoutOwnedRecipesInput = {
@@ -797,6 +857,8 @@ export type AccountUncheckedCreateWithoutOwnedRecipesInput = {
   updatedAt?: Date | string
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutAccountInput
   gameHistory?: Prisma.GameHistoryUncheckedCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutReporterInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutOwnerInput
 }
 
 export type AccountCreateOrConnectWithoutOwnedRecipesInput = {
@@ -830,6 +892,8 @@ export type AccountUpdateWithoutOwnedRecipesInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.SessionUpdateManyWithoutAccountNestedInput
   gameHistory?: Prisma.GameHistoryUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUpdateManyWithoutOwnerNestedInput
 }
 
 export type AccountUncheckedUpdateWithoutOwnedRecipesInput = {
@@ -847,6 +911,192 @@ export type AccountUncheckedUpdateWithoutOwnedRecipesInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutAccountNestedInput
   gameHistory?: Prisma.GameHistoryUncheckedUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUncheckedUpdateManyWithoutReporterNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutOwnerNestedInput
+}
+
+export type AccountCreateWithoutRecipeReportsInput = {
+  id?: string
+  username: string
+  normalizedUsername: string
+  displayName: string
+  passwordHash: string
+  passwordSalt: string
+  reducedMotion?: boolean
+  highContrast?: boolean
+  masterVolume?: number
+  voiceVolume?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionCreateNestedManyWithoutAccountInput
+  gameHistory?: Prisma.GameHistoryCreateNestedManyWithoutAccountInput
+  ownedRecipes?: Prisma.OwnedRecipeCreateNestedManyWithoutAccountInput
+  recipeTestTokens?: Prisma.RecipeTestTokenCreateNestedManyWithoutOwnerInput
+}
+
+export type AccountUncheckedCreateWithoutRecipeReportsInput = {
+  id?: string
+  username: string
+  normalizedUsername: string
+  displayName: string
+  passwordHash: string
+  passwordSalt: string
+  reducedMotion?: boolean
+  highContrast?: boolean
+  masterVolume?: number
+  voiceVolume?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutAccountInput
+  gameHistory?: Prisma.GameHistoryUncheckedCreateNestedManyWithoutAccountInput
+  ownedRecipes?: Prisma.OwnedRecipeUncheckedCreateNestedManyWithoutAccountInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedCreateNestedManyWithoutOwnerInput
+}
+
+export type AccountCreateOrConnectWithoutRecipeReportsInput = {
+  where: Prisma.AccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.AccountCreateWithoutRecipeReportsInput, Prisma.AccountUncheckedCreateWithoutRecipeReportsInput>
+}
+
+export type AccountUpsertWithoutRecipeReportsInput = {
+  update: Prisma.XOR<Prisma.AccountUpdateWithoutRecipeReportsInput, Prisma.AccountUncheckedUpdateWithoutRecipeReportsInput>
+  create: Prisma.XOR<Prisma.AccountCreateWithoutRecipeReportsInput, Prisma.AccountUncheckedCreateWithoutRecipeReportsInput>
+  where?: Prisma.AccountWhereInput
+}
+
+export type AccountUpdateToOneWithWhereWithoutRecipeReportsInput = {
+  where?: Prisma.AccountWhereInput
+  data: Prisma.XOR<Prisma.AccountUpdateWithoutRecipeReportsInput, Prisma.AccountUncheckedUpdateWithoutRecipeReportsInput>
+}
+
+export type AccountUpdateWithoutRecipeReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  normalizedUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordSalt?: Prisma.StringFieldUpdateOperationsInput | string
+  reducedMotion?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  highContrast?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  masterVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  voiceVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUpdateManyWithoutAccountNestedInput
+  gameHistory?: Prisma.GameHistoryUpdateManyWithoutAccountNestedInput
+  ownedRecipes?: Prisma.OwnedRecipeUpdateManyWithoutAccountNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUpdateManyWithoutOwnerNestedInput
+}
+
+export type AccountUncheckedUpdateWithoutRecipeReportsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  normalizedUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordSalt?: Prisma.StringFieldUpdateOperationsInput | string
+  reducedMotion?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  highContrast?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  masterVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  voiceVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutAccountNestedInput
+  gameHistory?: Prisma.GameHistoryUncheckedUpdateManyWithoutAccountNestedInput
+  ownedRecipes?: Prisma.OwnedRecipeUncheckedUpdateManyWithoutAccountNestedInput
+  recipeTestTokens?: Prisma.RecipeTestTokenUncheckedUpdateManyWithoutOwnerNestedInput
+}
+
+export type AccountCreateWithoutRecipeTestTokensInput = {
+  id?: string
+  username: string
+  normalizedUsername: string
+  displayName: string
+  passwordHash: string
+  passwordSalt: string
+  reducedMotion?: boolean
+  highContrast?: boolean
+  masterVolume?: number
+  voiceVolume?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionCreateNestedManyWithoutAccountInput
+  gameHistory?: Prisma.GameHistoryCreateNestedManyWithoutAccountInput
+  ownedRecipes?: Prisma.OwnedRecipeCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportCreateNestedManyWithoutReporterInput
+}
+
+export type AccountUncheckedCreateWithoutRecipeTestTokensInput = {
+  id?: string
+  username: string
+  normalizedUsername: string
+  displayName: string
+  passwordHash: string
+  passwordSalt: string
+  reducedMotion?: boolean
+  highContrast?: boolean
+  masterVolume?: number
+  voiceVolume?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutAccountInput
+  gameHistory?: Prisma.GameHistoryUncheckedCreateNestedManyWithoutAccountInput
+  ownedRecipes?: Prisma.OwnedRecipeUncheckedCreateNestedManyWithoutAccountInput
+  recipeReports?: Prisma.RecipeReportUncheckedCreateNestedManyWithoutReporterInput
+}
+
+export type AccountCreateOrConnectWithoutRecipeTestTokensInput = {
+  where: Prisma.AccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.AccountCreateWithoutRecipeTestTokensInput, Prisma.AccountUncheckedCreateWithoutRecipeTestTokensInput>
+}
+
+export type AccountUpsertWithoutRecipeTestTokensInput = {
+  update: Prisma.XOR<Prisma.AccountUpdateWithoutRecipeTestTokensInput, Prisma.AccountUncheckedUpdateWithoutRecipeTestTokensInput>
+  create: Prisma.XOR<Prisma.AccountCreateWithoutRecipeTestTokensInput, Prisma.AccountUncheckedCreateWithoutRecipeTestTokensInput>
+  where?: Prisma.AccountWhereInput
+}
+
+export type AccountUpdateToOneWithWhereWithoutRecipeTestTokensInput = {
+  where?: Prisma.AccountWhereInput
+  data: Prisma.XOR<Prisma.AccountUpdateWithoutRecipeTestTokensInput, Prisma.AccountUncheckedUpdateWithoutRecipeTestTokensInput>
+}
+
+export type AccountUpdateWithoutRecipeTestTokensInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  normalizedUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordSalt?: Prisma.StringFieldUpdateOperationsInput | string
+  reducedMotion?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  highContrast?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  masterVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  voiceVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUpdateManyWithoutAccountNestedInput
+  gameHistory?: Prisma.GameHistoryUpdateManyWithoutAccountNestedInput
+  ownedRecipes?: Prisma.OwnedRecipeUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUpdateManyWithoutReporterNestedInput
+}
+
+export type AccountUncheckedUpdateWithoutRecipeTestTokensInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  normalizedUsername?: Prisma.StringFieldUpdateOperationsInput | string
+  displayName?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordSalt?: Prisma.StringFieldUpdateOperationsInput | string
+  reducedMotion?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  highContrast?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  masterVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  voiceVolume?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutAccountNestedInput
+  gameHistory?: Prisma.GameHistoryUncheckedUpdateManyWithoutAccountNestedInput
+  ownedRecipes?: Prisma.OwnedRecipeUncheckedUpdateManyWithoutAccountNestedInput
+  recipeReports?: Prisma.RecipeReportUncheckedUpdateManyWithoutReporterNestedInput
 }
 
 
@@ -858,12 +1108,16 @@ export type AccountCountOutputType = {
   sessions: number
   gameHistory: number
   ownedRecipes: number
+  recipeReports: number
+  recipeTestTokens: number
 }
 
 export type AccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   sessions?: boolean | AccountCountOutputTypeCountSessionsArgs
   gameHistory?: boolean | AccountCountOutputTypeCountGameHistoryArgs
   ownedRecipes?: boolean | AccountCountOutputTypeCountOwnedRecipesArgs
+  recipeReports?: boolean | AccountCountOutputTypeCountRecipeReportsArgs
+  recipeTestTokens?: boolean | AccountCountOutputTypeCountRecipeTestTokensArgs
 }
 
 /**
@@ -897,6 +1151,20 @@ export type AccountCountOutputTypeCountOwnedRecipesArgs<ExtArgs extends runtime.
   where?: Prisma.OwnedRecipeWhereInput
 }
 
+/**
+ * AccountCountOutputType without action
+ */
+export type AccountCountOutputTypeCountRecipeReportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RecipeReportWhereInput
+}
+
+/**
+ * AccountCountOutputType without action
+ */
+export type AccountCountOutputTypeCountRecipeTestTokensArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.RecipeTestTokenWhereInput
+}
+
 
 export type AccountSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -914,6 +1182,8 @@ export type AccountSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   sessions?: boolean | Prisma.Account$sessionsArgs<ExtArgs>
   gameHistory?: boolean | Prisma.Account$gameHistoryArgs<ExtArgs>
   ownedRecipes?: boolean | Prisma.Account$ownedRecipesArgs<ExtArgs>
+  recipeReports?: boolean | Prisma.Account$recipeReportsArgs<ExtArgs>
+  recipeTestTokens?: boolean | Prisma.Account$recipeTestTokensArgs<ExtArgs>
   _count?: boolean | Prisma.AccountCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["account"]>
 
@@ -967,6 +1237,8 @@ export type AccountInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   sessions?: boolean | Prisma.Account$sessionsArgs<ExtArgs>
   gameHistory?: boolean | Prisma.Account$gameHistoryArgs<ExtArgs>
   ownedRecipes?: boolean | Prisma.Account$ownedRecipesArgs<ExtArgs>
+  recipeReports?: boolean | Prisma.Account$recipeReportsArgs<ExtArgs>
+  recipeTestTokens?: boolean | Prisma.Account$recipeTestTokensArgs<ExtArgs>
   _count?: boolean | Prisma.AccountCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AccountIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -978,6 +1250,8 @@ export type $AccountPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     sessions: Prisma.$SessionPayload<ExtArgs>[]
     gameHistory: Prisma.$GameHistoryPayload<ExtArgs>[]
     ownedRecipes: Prisma.$OwnedRecipePayload<ExtArgs>[]
+    recipeReports: Prisma.$RecipeReportPayload<ExtArgs>[]
+    recipeTestTokens: Prisma.$RecipeTestTokenPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1389,6 +1663,8 @@ export interface Prisma__AccountClient<T, Null = never, ExtArgs extends runtime.
   sessions<T extends Prisma.Account$sessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Account$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   gameHistory<T extends Prisma.Account$gameHistoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Account$gameHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GameHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   ownedRecipes<T extends Prisma.Account$ownedRecipesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Account$ownedRecipesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OwnedRecipePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  recipeReports<T extends Prisma.Account$recipeReportsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Account$recipeReportsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RecipeReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  recipeTestTokens<T extends Prisma.Account$recipeTestTokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Account$recipeTestTokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RecipeTestTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1890,6 +2166,54 @@ export type Account$ownedRecipesArgs<ExtArgs extends runtime.Types.Extensions.In
   take?: number
   skip?: number
   distinct?: Prisma.OwnedRecipeScalarFieldEnum | Prisma.OwnedRecipeScalarFieldEnum[]
+}
+
+/**
+ * Account.recipeReports
+ */
+export type Account$recipeReportsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RecipeReport
+   */
+  select?: Prisma.RecipeReportSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RecipeReport
+   */
+  omit?: Prisma.RecipeReportOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RecipeReportInclude<ExtArgs> | null
+  where?: Prisma.RecipeReportWhereInput
+  orderBy?: Prisma.RecipeReportOrderByWithRelationInput | Prisma.RecipeReportOrderByWithRelationInput[]
+  cursor?: Prisma.RecipeReportWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RecipeReportScalarFieldEnum | Prisma.RecipeReportScalarFieldEnum[]
+}
+
+/**
+ * Account.recipeTestTokens
+ */
+export type Account$recipeTestTokensArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the RecipeTestToken
+   */
+  select?: Prisma.RecipeTestTokenSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the RecipeTestToken
+   */
+  omit?: Prisma.RecipeTestTokenOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.RecipeTestTokenInclude<ExtArgs> | null
+  where?: Prisma.RecipeTestTokenWhereInput
+  orderBy?: Prisma.RecipeTestTokenOrderByWithRelationInput | Prisma.RecipeTestTokenOrderByWithRelationInput[]
+  cursor?: Prisma.RecipeTestTokenWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.RecipeTestTokenScalarFieldEnum | Prisma.RecipeTestTokenScalarFieldEnum[]
 }
 
 /**

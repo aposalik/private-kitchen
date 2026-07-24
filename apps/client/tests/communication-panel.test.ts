@@ -37,6 +37,20 @@ describe("CommunicationPanel", () => {
     expect(connection.sendDrawingStroke).toHaveBeenCalledWith("BLACK", "MEDIUM", [{ x: 0, y: 0 }, { x: 1, y: 1 }]);
   });
 
+  test("editable drawing cancellation and lost capture discard an in-progress stroke", () => {
+    for (const cancellation of ["pointercancel", "lostpointercapture"]) {
+      const { root, connection } = mount("RECIPE_KEEPER");
+      const canvas = root.querySelector<HTMLCanvasElement>('canvas[data-drawing-board][data-editable="true"]')!;
+      vi.spyOn(canvas, "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 200, height: 100, right: 200, bottom: 100, x: 0, y: 0, toJSON: () => ({}) });
+      canvas.dispatchEvent(pointer("pointerdown", 10, 10));
+      canvas.dispatchEvent(pointer("pointermove", 100, 50));
+      canvas.dispatchEvent(pointer(cancellation, 100, 50));
+      canvas.dispatchEvent(pointer("pointerup", 190, 90));
+
+      expect(connection.sendDrawingStroke).not.toHaveBeenCalled();
+    }
+  });
+
   test("timer-only snapshots preserve the interactive drawing canvas", () => {
     const { root, connection, voice } = mount("RECIPE_KEEPER");
     const canvas = root.querySelector<HTMLCanvasElement>("canvas[data-drawing-board]")!;
@@ -135,16 +149,19 @@ describe("CommunicationPanel", () => {
   });
 
   test.each([
-    ["BLIND_COOK", "Microphone on · Voice output on"],
-    ["RECIPE_KEEPER", "Microphone off · Voice output on"],
-    ["DEAF_KITCHEN_GUIDE", "Microphone on · Voice output off"],
-  ] as const)("%s renders its exact grant and user-gesture enable", async (role, policy) => {
+    ["BLIND_COOK", "Microphone on · Voice output on", true],
+    ["RECIPE_KEEPER", "Microphone off · Voice output on", true],
+    ["DEAF_KITCHEN_GUIDE", "Microphone off · Voice output off", false],
+  ] as const)("%s renders its exact grant and user-gesture enable", async (role, policy, canEnable) => {
     const { root, voice } = mount(role);
     expect(root.querySelector("[data-voice-policy]")?.textContent).toBe(policy);
     expect(root.querySelector("[data-voice-stream-count]")?.textContent).toBe("Remote streams: 0");
     expect(voice.configure).toHaveBeenCalledWith("room", role, expect.any(Object), expect.any(Array), true);
-    root.querySelector<HTMLButtonElement>("[data-enable-voice]")!.click();
-    await vi.waitFor(() => expect(voice.enable).toHaveBeenCalled());
+    const enable = root.querySelector<HTMLButtonElement>("[data-enable-voice]");
+    expect(enable !== null).toBe(canEnable);
+    enable?.click();
+    if (canEnable) await vi.waitFor(() => expect(voice.enable).toHaveBeenCalled());
+    else expect(voice.enable).not.toHaveBeenCalled();
   });
 
   test("enabled voice renders a disable control and reconnect suspends without revoking opt-in", () => {
@@ -175,7 +192,7 @@ function snapshot(role: PlayerRole, extra: Partial<LobbySnapshot> = {}): LobbySn
   const grants = {
     BLIND_COOK: { canPublish: true, canReceive: true },
     RECIPE_KEEPER: { canPublish: false, canReceive: true },
-    DEAF_KITCHEN_GUIDE: { canPublish: true, canReceive: false },
+    DEAF_KITCHEN_GUIDE: { canPublish: false, canReceive: false },
   } as const;
   return { connectionStatus: "CONNECTED", roomId: "room", sessionId: role, role, connectedCount: 3, roomStatus: "READY", players: [{ id: role, role }], voiceGrant: grants[role], ...extra };
 }

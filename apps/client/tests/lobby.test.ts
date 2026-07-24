@@ -1,16 +1,34 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import type {
   LobbyConnection,
   LobbySnapshot,
 } from "../src/network/RoomClient.js";
+import { PLAYTEST_FEEDBACK_KEY } from "../src/playtest/PlaytestFeedback.js";
 import type { PrivateRecipePayload, VoiceRelayEnvelope } from "@cooking-game/shared";
 import { Lobby } from "../src/ui/Lobby.js";
 
 describe("Lobby", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
+  });
+
+  test("stylesheet encodes the mobile viewport, safe-area, touch target, focus, canvas, wrapping, and motion contract", () => {
+    const styles = readFileSync("src/styles.css", "utf8");
+    expect(styles).toContain("min-height: 100dvh");
+    for (const edge of ["top", "right", "bottom", "left"]) {
+      expect(styles).toContain(`env(safe-area-inset-${edge})`);
+    }
+    expect(styles).toMatch(/overflow-x:\s*clip/);
+    expect(styles).toMatch(/minmax\(min\(100%,/);
+    expect(styles).toMatch(/\[data-touch-capable="true"\][\s\S]*min-width:\s*44px[\s\S]*min-height:\s*44px/);
+    expect(styles).toMatch(/:focus-visible/);
+    expect(styles).toMatch(/canvas\[data-drawing-board\][\s\S]*max-width:\s*100%/);
+    expect(styles).toMatch(/canvas\[data-editable="true"\][\s\S]*touch-action:\s*none/);
+    expect(styles).toMatch(/\.communication-panel[\s\S]*flex-wrap:\s*wrap/);
+    expect(styles).toMatch(/prefers-reduced-motion:\s*reduce/);
   });
 
   test("scopes player fields and errors to the lobby when another form shares their names", async () => {
@@ -161,6 +179,87 @@ describe("Lobby", () => {
     expect(root.textContent).toContain("Ready");
   });
 
+  test("exposes stable view state and swaps setup for the connected Operate surface", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection).mount();
+
+    expect(root.dataset.connectionState).toBe("DISCONNECTED");
+    expect(root.dataset.roundPhase).toBe("WAITING");
+    expect(root.dataset.playerRole).toBe("");
+    expect(root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>("[data-operate-surface]")!.hidden).toBe(true);
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      roomId: "ROOM123",
+      role: "RECIPE_KEEPER",
+      connectedCount: 3,
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+      remainingMs: 240_000,
+      completedStepCount: 2,
+      totalStepCount: 10,
+    });
+
+    expect(root.dataset.connectionState).toBe("CONNECTED");
+    expect(root.dataset.roundPhase).toBe("RUNNING");
+    expect(root.dataset.playerRole).toBe("RECIPE_KEEPER");
+    expect(root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>("[data-operate-surface]")!.hidden).toBe(false);
+    expect(root.querySelector("[data-game-hud]")).not.toBeNull();
+    expect(root.querySelector("[data-role-briefing]")?.textContent).toContain("Recipe Keeper");
+  });
+
+  test.each([
+    ["PAUSED", "Waiting for all players to reconnect."],
+    ["WON", "Review the completed round."],
+    ["LOST", "Review the ended round."],
+  ] as const)("keeps %s role and authoritative round state readable", (roundStatus, message) => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection).mount();
+
+    connection.emit({
+      connectionStatus: roundStatus === "PAUSED" ? "RECONNECTING" : "CONNECTED",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus,
+      remainingMs: roundStatus === "LOST" ? 0 : 42_000,
+      completedStepCount: roundStatus === "WON" ? 10 : 7,
+      totalStepCount: 10,
+    });
+
+    expect(root.dataset.roundPhase).toBe(roundStatus);
+    expect(root.querySelector("[data-role-objective]")?.textContent).toContain(message);
+    expect(root.querySelector("[data-round-status]")?.textContent).toBe(
+      roundStatus === "PAUSED" ? "Paused" : roundStatus === "WON" ? "Won" : "Lost",
+    );
+    expect(root.querySelector<HTMLElement>("[data-operate-surface]")!.hidden).toBe(false);
+  });
+
+  test("keeps existing authority and recipe privacy controls inside the role workspace", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection).mount();
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      role: "DEAF_KITCHEN_GUIDE",
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+      privateRecipe: privateRecipe(),
+      objects: [{ id: "raw", kind: "TOMATO", label: "Tomato", x: 24, y: 18, preparation: "RAW", location: "COUNTER" }],
+    });
+
+    const workspace = root.querySelector("[data-role-workspace]")!;
+    expect(workspace.querySelector("[data-point-object]")).not.toBeNull();
+    expect(workspace.querySelector("[data-pick-up], [data-drop], [data-private-recipe]")).toBeNull();
+    expect(root.querySelector("[data-communication-root]")).not.toBeNull();
+  });
+
   test("mounts an accessible authoritative round HUD and formats server values", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
@@ -258,8 +357,8 @@ describe("Lobby", () => {
     expect(panel.textContent).toContain("2 × Tomato");
     expect(panel.textContent).toContain("1 × Onion");
     expect(Array.from(panel.querySelectorAll("[data-recipe-step]"), (step) => step.textContent)).toEqual([
-      "Chop Tomato",
-      "Add Tomato to pot",
+      "Chop Tomato × 2",
+      "Add Tomato to pot × 2",
       "Season",
       "Boil",
       "Mix",
@@ -444,6 +543,17 @@ describe("Lobby", () => {
       role: "BLIND_COOK",
       roomStatus: "READY",
       roundStatus: "RUNNING",
+      completedStepCount: 2,
+      totalStepCount: 6,
+    });
+    expect(root.querySelector<HTMLButtonElement>("[data-station-controls] [data-cook-action]")?.dataset.cookAction)
+      .toBe("SEASON");
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
       completedStepCount: 5,
       totalStepCount: 10,
     });
@@ -514,6 +624,8 @@ describe("Lobby", () => {
     expect(result.getAttribute("aria-labelledby")).toBeTruthy();
     expect(result.querySelector("h2")!.textContent).toBe("Round won!");
     expect(result.textContent).toContain("10 / 10 steps completed");
+    expect(root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>("[data-account-surface]")!.hidden).toBe(false);
     expect(root.querySelectorAll("[data-pick-up], [data-drop], [data-cook-action]")).toHaveLength(0);
     expect(Array.from(root.querySelectorAll<HTMLButtonElement>("[data-point-object], [data-point-location]")).every((button) => button.disabled)).toBe(true);
   });
@@ -540,6 +652,123 @@ describe("Lobby", () => {
     expect(result.textContent).toContain("7 / 10 steps completed");
     expect(root.querySelector("[data-round-timer]")!.textContent).toBe("00:00");
     expect(root.querySelectorAll("[data-pick-up], [data-drop], [data-cook-action]")).toHaveLength(0);
+  });
+
+  test("shows terminal debrief after the result and records only monotonic running duration", () => {
+    localStorage.removeItem(PLAYTEST_FEEDBACK_KEY);
+    let now = 1_000;
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, {
+      storage: localStorage,
+      monotonicNow: () => now,
+      exportFeedback: () => undefined,
+    }).mount();
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+      completedStepCount: 0,
+      totalStepCount: 10,
+    });
+    expect(root.querySelector("[data-playtest-debrief]")).toBeNull();
+
+    now += 3_200;
+    connection.emit({
+      connectionStatus: "RECONNECTING",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "PAUSED",
+      completedStepCount: 4,
+      totalStepCount: 10,
+    });
+    now += 10_000;
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+      completedStepCount: 4,
+      totalStepCount: 10,
+    });
+    now += 1_800;
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "WON",
+      completedStepCount: 10,
+      totalStepCount: 10,
+    });
+
+    const result = root.querySelector("[data-round-result]")!;
+    const debrief = root.querySelector("[data-playtest-debrief]")!;
+    expect(result.compareDocumentPosition(debrief) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const [name, value] of [
+      ["participationRating", "4"],
+      ["communicationClarity", "3"],
+      ["frustration", "2"],
+      ["replayIntent", "YES"],
+    ]) {
+      root.querySelector<HTMLSelectElement>(`select[name="${name}"]`)!.value = value;
+    }
+    root.querySelector<HTMLInputElement>('[name="misunderstoodSignals"][value="NONE"]')!.checked = true;
+    root.querySelector<HTMLButtonElement>("[data-feedback-submit]")!.click();
+
+    const records = JSON.parse(localStorage.getItem(PLAYTEST_FEEDBACK_KEY) ?? "[]");
+    expect(records).toEqual([expect.objectContaining({
+      role: "BLIND_COOK",
+      roundOutcome: "WON",
+      observedDurationSeconds: 5,
+      misunderstoodSignals: ["NONE"],
+    })]);
+  });
+
+  test("resets observed duration when waiting separates two terminal rounds", () => {
+    localStorage.removeItem(PLAYTEST_FEEDBACK_KEY);
+    let now = 1_000;
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, {
+      storage: localStorage,
+      monotonicNow: () => now,
+      exportFeedback: () => undefined,
+    }).mount();
+    const snapshot = {
+      connectionStatus: "CONNECTED" as const,
+      role: "BLIND_COOK" as const,
+      roomStatus: "READY" as const,
+      completedStepCount: 0,
+      totalStepCount: 10,
+    };
+
+    connection.emit({ ...snapshot, roundStatus: "RUNNING" });
+    now += 4_000;
+    connection.emit({ ...snapshot, roundStatus: "LOST" });
+    connection.emit({ ...snapshot, roundStatus: "NOT_STARTED" });
+    now += 2_000;
+    connection.emit({ ...snapshot, roundStatus: "RUNNING" });
+    now += 1_000;
+    connection.emit({ ...snapshot, roundStatus: "WON", completedStepCount: 10 });
+
+    const debrief = root.querySelector<HTMLElement>("[data-playtest-debrief]")!;
+    for (const [name, value] of [
+      ["participationRating", "4"],
+      ["communicationClarity", "4"],
+      ["frustration", "2"],
+      ["replayIntent", "YES"],
+    ]) {
+      debrief.querySelector<HTMLSelectElement>(`select[name="${name}"]`)!.value = value;
+    }
+    debrief.querySelector<HTMLInputElement>('[value="NONE"]')!.checked = true;
+    debrief.querySelector<HTMLButtonElement>("[data-feedback-submit]")!.click();
+
+    const records = JSON.parse(localStorage.getItem(PLAYTEST_FEEDBACK_KEY) ?? "[]");
+    expect(records.at(-1)?.observedDurationSeconds).toBe(1);
   });
 
   test("does not infer a result and removes an old result on a nonterminal snapshot", () => {

@@ -21,6 +21,7 @@ export class DrawingBoard {
       this.canvas.addEventListener("pointermove", (event) => this.move(event));
       this.canvas.addEventListener("pointerup", (event) => this.finish(event));
       this.canvas.addEventListener("pointercancel", () => this.cancel());
+      this.canvas.addEventListener("lostpointercapture", () => this.cancel());
     }
   }
 

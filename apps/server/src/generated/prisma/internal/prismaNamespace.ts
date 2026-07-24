@@ -400,7 +400,9 @@ export const ModelName = {
   Account: 'Account',
   Session: 'Session',
   GameHistory: 'GameHistory',
-  OwnedRecipe: 'OwnedRecipe'
+  OwnedRecipe: 'OwnedRecipe',
+  RecipeReport: 'RecipeReport',
+  RecipeTestToken: 'RecipeTestToken'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -416,7 +418,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "account" | "session" | "gameHistory" | "ownedRecipe"
+    modelProps: "account" | "session" | "gameHistory" | "ownedRecipe" | "recipeReport" | "recipeTestToken"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -716,6 +718,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    RecipeReport: {
+      payload: Prisma.$RecipeReportPayload<ExtArgs>
+      fields: Prisma.RecipeReportFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RecipeReportFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RecipeReportFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>
+        }
+        findFirst: {
+          args: Prisma.RecipeReportFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RecipeReportFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>
+        }
+        findMany: {
+          args: Prisma.RecipeReportFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>[]
+        }
+        create: {
+          args: Prisma.RecipeReportCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>
+        }
+        createMany: {
+          args: Prisma.RecipeReportCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RecipeReportCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>[]
+        }
+        delete: {
+          args: Prisma.RecipeReportDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>
+        }
+        update: {
+          args: Prisma.RecipeReportUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>
+        }
+        deleteMany: {
+          args: Prisma.RecipeReportDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RecipeReportUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RecipeReportUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>[]
+        }
+        upsert: {
+          args: Prisma.RecipeReportUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeReportPayload>
+        }
+        aggregate: {
+          args: Prisma.RecipeReportAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRecipeReport>
+        }
+        groupBy: {
+          args: Prisma.RecipeReportGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RecipeReportGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RecipeReportCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RecipeReportCountAggregateOutputType> | number
+        }
+      }
+    }
+    RecipeTestToken: {
+      payload: Prisma.$RecipeTestTokenPayload<ExtArgs>
+      fields: Prisma.RecipeTestTokenFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RecipeTestTokenFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RecipeTestTokenFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>
+        }
+        findFirst: {
+          args: Prisma.RecipeTestTokenFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RecipeTestTokenFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>
+        }
+        findMany: {
+          args: Prisma.RecipeTestTokenFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>[]
+        }
+        create: {
+          args: Prisma.RecipeTestTokenCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>
+        }
+        createMany: {
+          args: Prisma.RecipeTestTokenCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RecipeTestTokenCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>[]
+        }
+        delete: {
+          args: Prisma.RecipeTestTokenDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>
+        }
+        update: {
+          args: Prisma.RecipeTestTokenUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>
+        }
+        deleteMany: {
+          args: Prisma.RecipeTestTokenDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RecipeTestTokenUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RecipeTestTokenUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>[]
+        }
+        upsert: {
+          args: Prisma.RecipeTestTokenUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RecipeTestTokenPayload>
+        }
+        aggregate: {
+          args: Prisma.RecipeTestTokenAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRecipeTestToken>
+        }
+        groupBy: {
+          args: Prisma.RecipeTestTokenGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RecipeTestTokenGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RecipeTestTokenCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RecipeTestTokenCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -788,6 +938,7 @@ export const GameHistoryScalarFieldEnum = {
   roundId: 'roundId',
   roomId: 'roomId',
   recipeId: 'recipeId',
+  recipeSnapshotJson: 'recipeSnapshotJson',
   outcome: 'outcome',
   outcomeReason: 'outcomeReason',
   completedStepCount: 'completedStepCount',
@@ -805,11 +956,46 @@ export const OwnedRecipeScalarFieldEnum = {
   accountId: 'accountId',
   title: 'title',
   documentJson: 'documentJson',
+  publishedDocumentJson: 'publishedDocumentJson',
+  status: 'status',
+  license: 'license',
+  publishedAt: 'publishedAt',
+  removedAt: 'removedAt',
+  removalReason: 'removalReason',
+  publicationVersion: 'publicationVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type OwnedRecipeScalarFieldEnum = (typeof OwnedRecipeScalarFieldEnum)[keyof typeof OwnedRecipeScalarFieldEnum]
+
+
+export const RecipeReportScalarFieldEnum = {
+  id: 'id',
+  recipeId: 'recipeId',
+  reporterAccountId: 'reporterAccountId',
+  reason: 'reason',
+  details: 'details',
+  status: 'status',
+  createdAt: 'createdAt',
+  resolvedAt: 'resolvedAt'
+} as const
+
+export type RecipeReportScalarFieldEnum = (typeof RecipeReportScalarFieldEnum)[keyof typeof RecipeReportScalarFieldEnum]
+
+
+export const RecipeTestTokenScalarFieldEnum = {
+  id: 'id',
+  tokenHash: 'tokenHash',
+  recipeId: 'recipeId',
+  ownerAccountId: 'ownerAccountId',
+  snapshotJson: 'snapshotJson',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type RecipeTestTokenScalarFieldEnum = (typeof RecipeTestTokenScalarFieldEnum)[keyof typeof RecipeTestTokenScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -818,6 +1004,14 @@ export const SortOrder = {
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
 
@@ -851,6 +1045,34 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'DateTime'
  */
 export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+    
+
+
+/**
+ * Reference to a field of type 'RecipeStatus'
+ */
+export type EnumRecipeStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RecipeStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'RecipeLicense'
+ */
+export type EnumRecipeLicenseFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RecipeLicense'>
+    
+
+
+/**
+ * Reference to a field of type 'RecipeReportReason'
+ */
+export type EnumRecipeReportReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RecipeReportReason'>
+    
+
+
+/**
+ * Reference to a field of type 'ReportStatus'
+ */
+export type EnumReportStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ReportStatus'>
     
 
 
@@ -1015,6 +1237,8 @@ export type GlobalOmitConfig = {
   session?: Prisma.SessionOmit
   gameHistory?: Prisma.GameHistoryOmit
   ownedRecipe?: Prisma.OwnedRecipeOmit
+  recipeReport?: Prisma.RecipeReportOmit
+  recipeTestToken?: Prisma.RecipeTestTokenOmit
 }
 
 /* Types for Logging */

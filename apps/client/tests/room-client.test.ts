@@ -617,15 +617,15 @@ describe("RoomClient lifecycle", () => {
     deafRoom.setAuthoritativePlayer("DEAF_KITCHEN_GUIDE");
     await connecting;
 
-    deafRoom.emitMessage("VOICE_GRANT", { canPublish: true, canReceive: false });
+    deafRoom.emitMessage("VOICE_GRANT", { canPublish: false, canReceive: false });
     deafRoom.emitMessage("COMMUNICATION_EVENT", { kind: "RECIPE_CARD", card: "CHOP", senderId: "recipe", senderRole: "RECIPE_KEEPER", sequence: 1, timestamp: 10 } satisfies CommunicationEvent);
     deafRoom.emitMessage("DRAWING_SNAPSHOT", { strokes: [] } satisfies DrawingSnapshot);
-    expect(snapshots.at(-1)).toMatchObject({ voiceGrant: { canPublish: true, canReceive: false } });
+    expect(snapshots.at(-1)).toMatchObject({ voiceGrant: { canPublish: false, canReceive: false } });
     expect(snapshots.at(-1)?.communicationFeed).toHaveLength(1);
 
-    deafRoom.emitMessage("VOICE_GRANT", { canPublish: false, canReceive: false, forged: true });
+    deafRoom.emitMessage("VOICE_GRANT", { canPublish: true, canReceive: false, forged: true });
     deafRoom.emitMessage("COMMUNICATION_EVENT", { kind: "RECIPE_CARD", card: "<img onerror=evil>", senderId: "evil", senderRole: "RECIPE_KEEPER", sequence: 2, timestamp: 11 });
-    expect(snapshots.at(-1)?.voiceGrant).toEqual({ canPublish: true, canReceive: false });
+    expect(snapshots.at(-1)?.voiceGrant).toEqual({ canPublish: false, canReceive: false });
     expect(snapshots.at(-1)?.communicationFeed).toHaveLength(1);
   });
 

@@ -1,7 +1,13 @@
 import type { Recipe } from "@cooking-game/recipe-schema";
 import { validateRecipe } from "@cooking-game/recipe-schema";
+import { createHash, randomBytes } from "node:crypto";
 
-import type { Account, GameHistory } from "../generated/prisma/client.js";
+import type {
+  Account,
+  GameHistory,
+  RecipeLicense,
+  RecipeReportReason,
+} from "../generated/prisma/client.js";
 import type { DatabaseClient } from "./client.js";
 
 export interface AccountPreferences {
@@ -24,6 +30,7 @@ export interface NewGameHistory {
   roundId: string;
   roomId: string;
   recipeId: string;
+  recipeSnapshotJson: string;
   outcome: "WON" | "LOST";
   outcomeReason: string;
   completedStepCount: number;
@@ -36,6 +43,12 @@ export interface OwnedRecipeRecord {
   id: string;
   title: string;
   document: Recipe;
+  status: "DRAFT" | "PUBLISHED" | "REMOVED";
+  license: RecipeLicense | null;
+  publishedAt: Date | null;
+  removedAt: Date | null;
+  removalReason: string | null;
+  publicationVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -116,9 +129,10 @@ export class PrismaRepository {
     }
   }
 
-  listGameHistory(accountId: string): Promise<GameHistory[]> {
+  listGameHistory(accountId: string): Promise<Array<Omit<GameHistory, "recipeSnapshotJson">>> {
     return this.database.gameHistory.findMany({
       where: { accountId },
+      omit: { recipeSnapshotJson: true },
       orderBy: [{ finishedAt: "desc" }, { id: "desc" }],
       take: 100,
     });
@@ -147,15 +161,153 @@ export class PrismaRepository {
 
   async updateOwnedRecipe(accountId: string, recipeId: string, document: Recipe): Promise<OwnedRecipeRecord | null> {
     const result = await this.database.ownedRecipe.updateMany({
-      where: { id: recipeId, accountId },
+      where: { id: recipeId, accountId, status: "DRAFT" },
       data: { title: document.title, documentJson: JSON.stringify(document) },
     });
     return result.count === 0 ? null : this.findOwnedRecipe(accountId, recipeId);
   }
 
   async deleteOwnedRecipe(accountId: string, recipeId: string): Promise<boolean> {
-    const result = await this.database.ownedRecipe.deleteMany({ where: { id: recipeId, accountId } });
+    const result = await this.database.ownedRecipe.deleteMany({ where: { id: recipeId, accountId, status: "DRAFT" } });
     return result.count === 1;
+  }
+
+  async publishOwnedRecipe(
+    accountId: string,
+    recipeId: string,
+    license: RecipeLicense,
+    publishedAt: Date,
+  ): Promise<OwnedRecipeRecord | null> {
+    const published = await this.database.$transaction(async (transaction) => {
+      const draft = await transaction.ownedRecipe.findFirst({
+        where: { id: recipeId, accountId, status: "DRAFT" },
+        select: { documentJson: true },
+      });
+      if (!draft) return false;
+      const result = await transaction.ownedRecipe.updateMany({
+        where: { id: recipeId, accountId, status: "DRAFT" },
+        data: {
+          status: "PUBLISHED",
+          license,
+          publishedAt,
+          publishedDocumentJson: draft.documentJson,
+          removedAt: null,
+          removalReason: null,
+          publicationVersion: { increment: 1 },
+        },
+      });
+      return result.count === 1;
+    });
+    return published ? this.findOwnedRecipe(accountId, recipeId) : null;
+  }
+
+  async unpublishOwnedRecipe(accountId: string, recipeId: string): Promise<OwnedRecipeRecord | null> {
+    const result = await this.database.ownedRecipe.updateMany({
+      where: { id: recipeId, accountId, status: "PUBLISHED" },
+      data: { status: "DRAFT", publishedAt: null },
+    });
+    return result.count === 0 ? null : this.findOwnedRecipe(accountId, recipeId);
+  }
+
+  async listPublishedRecipes(input: { query?: string; cursor?: string; take?: number }) {
+    const rows = await this.database.ownedRecipe.findMany({
+      where: {
+        status: "PUBLISHED",
+        ...(input.query ? { title: { contains: input.query } } : {}),
+        ...(input.cursor ? { id: { lt: input.cursor } } : {}),
+      },
+      orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+      take: Math.min(Math.max(input.take ?? 20, 1), 50),
+    });
+    return rows.map(publicRecipeMetadata);
+  }
+
+  async findPublishedRecipe(recipeId: string) {
+    const row = await this.database.ownedRecipe.findFirst({
+      where: { id: recipeId, status: "PUBLISHED" },
+    });
+    return row?.publishedDocumentJson
+      ? { ...publicRecipeMetadata(row), document: deserializeDocument(row.publishedDocumentJson) }
+      : null;
+  }
+
+  async createRecipeReport(input: {
+    recipeId: string;
+    reporterAccountId: string;
+    reason: RecipeReportReason;
+    details: string;
+  }) {
+    try {
+      return await this.database.recipeReport.create({ data: input });
+    } catch (error) {
+      if (isPrismaError(error, "P2002") || isPrismaError(error, "P2003")) return null;
+      throw error;
+    }
+  }
+
+  listOpenRecipeReports(take = 50) {
+    return this.database.recipeReport.findMany({
+      where: { status: "OPEN" },
+      include: { recipe: { select: { id: true, title: true, status: true } } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: Math.min(Math.max(take, 1), 100),
+    });
+  }
+
+  async removePublishedRecipe(recipeId: string, reason: string, removedAt: Date): Promise<boolean> {
+    const result = await this.database.ownedRecipe.updateMany({
+      where: { id: recipeId, status: "PUBLISHED" },
+      data: { status: "REMOVED", removedAt, removalReason: reason },
+    });
+    return result.count === 1;
+  }
+
+  async restoreRemovedRecipe(recipeId: string): Promise<boolean> {
+    const result = await this.database.ownedRecipe.updateMany({
+      where: { id: recipeId, status: "REMOVED" },
+      data: { status: "DRAFT", license: null, publishedAt: null, removedAt: null, removalReason: null },
+    });
+    return result.count === 1;
+  }
+
+  async createPrivateTestToken(ownerAccountId: string, recipeId: string, expiresAt: Date) {
+    const recipe = await this.database.ownedRecipe.findFirst({
+      where: { id: recipeId, accountId: ownerAccountId, status: { not: "REMOVED" } },
+      select: { id: true, documentJson: true },
+    });
+    if (!recipe) return null;
+    const token = randomBytes(24).toString("base64url");
+    await this.database.recipeTestToken.create({
+      data: {
+        tokenHash: hashOpaqueToken(token),
+        recipeId,
+        ownerAccountId,
+        snapshotJson: recipe.documentJson,
+        expiresAt,
+      },
+    });
+    return { token, expiresAt };
+  }
+
+  async consumePrivateTestToken(token: string, now: Date) {
+    const tokenHash = hashOpaqueToken(token);
+    return this.database.$transaction(async (transaction) => {
+      const row = await transaction.recipeTestToken.findFirst({
+        where: { tokenHash, consumedAt: null, expiresAt: { gt: now }, recipe: { status: { not: "REMOVED" } } },
+        include: { recipe: true },
+      });
+      if (!row) return null;
+      const consumed = await transaction.recipeTestToken.updateMany({
+        where: { id: row.id, consumedAt: null },
+        data: { consumedAt: now },
+      });
+      if (consumed.count !== 1) return null;
+      return {
+        recipeId: row.recipeId,
+        ownerAccountId: row.ownerAccountId,
+        document: deserializeDocument(row.snapshotJson),
+      };
+    });
   }
 }
 
@@ -163,12 +315,60 @@ function deserializeOwnedRecipe(row: {
   id: string;
   title: string;
   documentJson: string;
+  status: "DRAFT" | "PUBLISHED" | "REMOVED";
+  license: RecipeLicense | null;
+  publishedAt: Date | null;
+  removedAt: Date | null;
+  removalReason: string | null;
+  publicationVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }): OwnedRecipeRecord {
-  const parsed = validateRecipe(JSON.parse(row.documentJson) as unknown);
+  return {
+    id: row.id,
+    title: row.title,
+    document: deserializeDocument(row.documentJson),
+    status: row.status,
+    license: row.license,
+    publishedAt: row.publishedAt,
+    removedAt: row.removedAt,
+    removalReason: row.removalReason,
+    publicationVersion: row.publicationVersion,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function deserializeDocument(documentJson: string): Recipe {
+  const parsed = validateRecipe(JSON.parse(documentJson) as unknown);
   if (!parsed.success) throw new Error("Stored recipe document is invalid");
-  return { id: row.id, title: row.title, document: parsed.data, createdAt: row.createdAt, updatedAt: row.updatedAt };
+  return parsed.data;
+}
+
+function publicRecipeMetadata(row: {
+  id: string;
+  title: string;
+  license: RecipeLicense | null;
+  publishedAt: Date | null;
+  publicationVersion: number;
+  documentJson: string;
+  publishedDocumentJson: string | null;
+}) {
+  const document = deserializeDocument(row.publishedDocumentJson ?? row.documentJson);
+  return {
+    id: row.id,
+    slug: document.id,
+    title: document.title,
+    license: row.license,
+    publishedAt: row.publishedAt,
+    publicationVersion: row.publicationVersion,
+    roundDurationMs: document.roundDurationMs,
+    ingredients: document.ingredients.map(({ kind, count }) => ({ kind, count })),
+  };
+}
+
+export function hashOpaqueToken(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
 function isPrismaError(error: unknown, code: string): boolean {

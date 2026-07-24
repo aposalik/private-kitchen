@@ -54,7 +54,9 @@ export const ModelName = {
   Account: 'Account',
   Session: 'Session',
   GameHistory: 'GameHistory',
-  OwnedRecipe: 'OwnedRecipe'
+  OwnedRecipe: 'OwnedRecipe',
+  RecipeReport: 'RecipeReport',
+  RecipeTestToken: 'RecipeTestToken'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -106,6 +108,7 @@ export const GameHistoryScalarFieldEnum = {
   roundId: 'roundId',
   roomId: 'roomId',
   recipeId: 'recipeId',
+  recipeSnapshotJson: 'recipeSnapshotJson',
   outcome: 'outcome',
   outcomeReason: 'outcomeReason',
   completedStepCount: 'completedStepCount',
@@ -123,11 +126,46 @@ export const OwnedRecipeScalarFieldEnum = {
   accountId: 'accountId',
   title: 'title',
   documentJson: 'documentJson',
+  publishedDocumentJson: 'publishedDocumentJson',
+  status: 'status',
+  license: 'license',
+  publishedAt: 'publishedAt',
+  removedAt: 'removedAt',
+  removalReason: 'removalReason',
+  publicationVersion: 'publicationVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type OwnedRecipeScalarFieldEnum = (typeof OwnedRecipeScalarFieldEnum)[keyof typeof OwnedRecipeScalarFieldEnum]
+
+
+export const RecipeReportScalarFieldEnum = {
+  id: 'id',
+  recipeId: 'recipeId',
+  reporterAccountId: 'reporterAccountId',
+  reason: 'reason',
+  details: 'details',
+  status: 'status',
+  createdAt: 'createdAt',
+  resolvedAt: 'resolvedAt'
+} as const
+
+export type RecipeReportScalarFieldEnum = (typeof RecipeReportScalarFieldEnum)[keyof typeof RecipeReportScalarFieldEnum]
+
+
+export const RecipeTestTokenScalarFieldEnum = {
+  id: 'id',
+  tokenHash: 'tokenHash',
+  recipeId: 'recipeId',
+  ownerAccountId: 'ownerAccountId',
+  snapshotJson: 'snapshotJson',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type RecipeTestTokenScalarFieldEnum = (typeof RecipeTestTokenScalarFieldEnum)[keyof typeof RecipeTestTokenScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -136,4 +174,12 @@ export const SortOrder = {
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 

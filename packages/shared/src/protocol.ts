@@ -4,4 +4,6 @@ export const DEFAULT_RECONNECTION_GRACE_SECONDS = 10;
 
 export interface KitchenJoinOptions {
   displayName: string;
+  recipeId?: string;
+  recipeTestToken?: string;
 }

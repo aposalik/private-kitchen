@@ -25,6 +25,8 @@ model Account {
   sessions           Session[]
   gameHistory        GameHistory[]
   ownedRecipes       OwnedRecipe[]
+  recipeReports      RecipeReport[]
+  recipeTestTokens   RecipeTestToken[]
 }
 
 model Session {
@@ -46,6 +48,7 @@ model GameHistory {
   roundId            String
   roomId             String
   recipeId           String
+  recipeSnapshotJson String?
   outcome            String
   outcomeReason      String
   completedStepCount Int
@@ -60,13 +63,81 @@ model GameHistory {
 }
 
 model OwnedRecipe {
-  id           String   @id @default(cuid())
-  accountId    String
-  title        String
-  documentJson String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  account      Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(cuid())
+  accountId          String
+  title              String
+  documentJson       String
+  publishedDocumentJson String?
+  status             RecipeStatus      @default(DRAFT)
+  license            RecipeLicense?
+  publishedAt        DateTime?
+  removedAt          DateTime?
+  removalReason      String?
+  publicationVersion Int               @default(0)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  account            Account           @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  reports            RecipeReport[]
+  testTokens         RecipeTestToken[]
 
   @@index([accountId, updatedAt])
+  @@index([status, publishedAt, id])
+}
+
+model RecipeReport {
+  id                String             @id @default(cuid())
+  recipeId          String
+  reporterAccountId String
+  reason            RecipeReportReason
+  details           String
+  status            ReportStatus       @default(OPEN)
+  createdAt         DateTime           @default(now())
+  resolvedAt        DateTime?
+  recipe            OwnedRecipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  reporter          Account            @relation(fields: [reporterAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterAccountId, recipeId])
+  @@index([status, createdAt, id])
+  @@index([recipeId, createdAt])
+}
+
+model RecipeTestToken {
+  id             String      @id @default(cuid())
+  tokenHash      String      @unique
+  recipeId       String
+  ownerAccountId String
+  snapshotJson   String
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime    @default(now())
+  recipe         OwnedRecipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  owner          Account     @relation(fields: [ownerAccountId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([ownerAccountId, recipeId])
+}
+
+enum RecipeStatus {
+  DRAFT
+  PUBLISHED
+  REMOVED
+}
+
+enum RecipeLicense {
+  CC0_1_0
+  CC_BY_4_0
+}
+
+enum RecipeReportReason {
+  HATE_OR_HARASSMENT
+  SEXUAL_CONTENT
+  VIOLENCE
+  SPAM
+  COPYRIGHT
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
 }

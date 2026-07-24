@@ -52,6 +52,14 @@ describe("AuthPanel", () => {
     expect(root.querySelector("[data-authenticated-account]")?.textContent).toContain("Alice");
   });
 
+  it("keeps published recipe discovery available to signed-out guests", async () => {
+    gateway.restore.mockResolvedValue(null);
+    new AuthPanel(root, gateway).mount();
+    await vi.waitFor(() => expect(root.querySelector("[data-auth-form]")).not.toBeNull());
+    expect(root.querySelector("[data-recipe-studio]")).not.toBeNull();
+    expect(root.querySelector("[data-recipe-form]")).toBeNull();
+  });
+
   it("uses a generic non-destructive sign-in error and disables controls while pending", async () => {
     gateway.restore.mockResolvedValue(null);
     gateway.login.mockRejectedValue(new Error("server detail must not render"));
@@ -81,9 +89,13 @@ describe("AuthPanel", () => {
     }));
     expect(root.querySelector("[data-history]")?.textContent).toContain("WON");
 
-    root.querySelector<HTMLTextAreaElement>("[name=recipeDocument]")!.value = JSON.stringify({ schemaVersion: 1 });
-    click("create-recipe");
-    await vi.waitFor(() => expect(gateway.createRecipe).toHaveBeenCalledWith({ schemaVersion: 1 }));
+    fill("recipeSlug", "test-soup");
+    fill("recipeTitle", "Test Soup");
+    fill("ingredient-tomato", "1");
+    root.querySelector<HTMLButtonElement>("[data-studio-action=save]")!.click();
+    await vi.waitFor(() => expect(gateway.createRecipe).toHaveBeenCalledWith(expect.objectContaining({
+      schemaVersion: 1, id: "test-soup", title: "Test Soup",
+    })));
     await vi.waitFor(() => expect(root.querySelector<HTMLButtonElement>("[data-auth-action=logout]")!.disabled).toBe(false));
 
     click("logout");
@@ -111,4 +123,12 @@ class FakeAuthGateway implements AuthGateway {
   history = vi.fn(async (): Promise<Array<Record<string, unknown>>> => []);
   recipes = vi.fn(async (): Promise<Array<Record<string, unknown>>> => []);
   createRecipe = vi.fn(async (_document: unknown): Promise<Record<string, unknown>> => ({ id: "recipe-1" }));
+  updateRecipe = vi.fn(async (_id: string, _document: unknown): Promise<Record<string, unknown>> => ({ id: "recipe-1" }));
+  validateRecipe = vi.fn(async () => ({ valid: true, issues: [] }));
+  publishRecipe = vi.fn(async () => ({ id: "recipe-1", status: "PUBLISHED" }));
+  unpublishRecipe = vi.fn(async () => ({ id: "recipe-1", status: "DRAFT" }));
+  deleteRecipe = vi.fn(async () => undefined);
+  createRecipeTestSession = vi.fn(async () => ({ recipeTestToken: "token", expiresAt: "2026-07-24T12:00:00Z" }));
+  discoverRecipes = vi.fn(async () => []);
+  reportRecipe = vi.fn(async () => undefined);
 }

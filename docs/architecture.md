@@ -74,3 +74,74 @@ no interaction buttons. Dynamic state and errors are assigned with `textContent`
 - Colyseus resolves the cookie from `AuthContext.headers`. Account IDs stay in server-only client auth metadata and never enter room state. A terminal callback records one row per authenticated account and room; database uniqueness makes duplicate callbacks harmless.
 
 Only username, display name, preferences, timestamps, authoritative round summaries, and owned recipe documents are retained. There is no email, profile tracking, plaintext password, or browser-readable auth token.
+
+## Phase 6 browser adaptation
+
+Mobile/browser support is client-only and does not alter authority,
+authentication, persistence, privacy, or wire contracts. `OrientationGate`
+combines coarse-pointer and portrait queries, makes the app inert only while a
+touch portrait gate is visible, and requests fullscreen/landscape lock only
+from its native button. Missing or rejected APIs degrade to manual rotation.
+`TouchControls` uses capability, Pointer Events, and keyboard events—never
+user-agent parsing—to annotate input without preventing native behavior or zoom.
+
+The responsive layout uses dynamic viewport units with a `100vh` fallback,
+safe-area insets, wrapping grids, visible focus, reduced-motion handling, and
+touch target sizing. A pre-SDK WebSocket constructor guard enforces the standard
+string/string-array protocols overload so WebKit synchronously rejects the
+Colyseus SDK's Node-only options probe and allows its browser fallback; it is
+idempotent, engine-neutral, and does not change URLs, credentials, or messages. Page pan/pinch remains enabled. `touch-action: none` is
+limited to the editable Recipe Keeper canvas; pointer cancellation and lost
+capture discard incomplete strokes. The server remains the only authority for
+touch-triggered gameplay intentions.
+
+Full multiplayer/account coverage remains Chromium-only. Firefox/WebKit run a
+narrow production smoke, while device-emulated Chrome/WebKit run mobile
+layout/touch scenarios. WebKit/device emulation is not physical Safari,
+hardware safe-area, OS browser chrome, microphone, or speaker evidence.
+
+## Phase 7 client operation and local evidence
+
+Phase 7 adds presentation and browser-local evidence only. `Lobby` maps
+authoritative snapshots to stable connection, round-phase, and player-role
+view attributes. A role briefing and phase-aware CSS composition prioritize
+the operation surface after connection while preserving every existing action,
+communication selector, permission, and private Recipe Keeper payload check.
+The client observes elapsed running time with a monotonic clock; it never
+changes or substitutes for the server timer or outcome.
+
+Terminal feedback is a strict allowlisted record stored only under
+`cooperative-cooking:phase7:playtest-feedback`. Reads validate runtime shape,
+storage retains the newest 30 records, export is deterministic JSON, and clear
+removes only that key. Records contain no name, account, room/session, IP,
+free-text, audio, or drawing data, and no feedback network path exists.
+
+## Phase 8 user-created recipes
+
+`OwnedRecipe` retains its stable record ID and adds lifecycle, license,
+publication, removal, and publication-version fields. `RecipeReport` has a
+unique reporter/recipe key. Private test tokens are random 192-bit values;
+SQLite stores only their SHA-256 hashes, owner/recipe bindings, expiry, and
+single-use consumption time. Publication, private testing, and game history
+pin separate immutable recipe documents in `publishedDocumentJson`,
+`snapshotJson`, and `recipeSnapshotJson`. The test-token snapshot column is
+required with no database default, so malformed direct inserts fail closed.
+
+Owner, public, report, test-session, publish, and moderation routes share the
+existing origin and 16 KiB JSON middleware. Separate IP/account rate-limit
+buckets bound recipe operations. Moderator access is derived only from the
+server `MODERATOR_USERNAMES` allowlist.
+
+Room creation accepts exactly one public record ID or private-test token.
+`startKitchenServer` resolves it through the repository before `KitchenRoom`
+initializes. No requested selection ever falls back. The validated resolved
+document is then passed to inventory provisioning, cooking progress, private
+Recipe Keeper delivery, countdown, and history. It is never added to public
+Colyseus state; Blind Cook and Deaf Kitchen Guide receive no ordered steps.
+
+Kitchen inventory is provisioned solely from the resolved snapshot: no bundled
+or unrelated objects survive in custom rooms. The cooking system derives each
+step quota from ingredient quantity, checks every declared dependency before
+advancing, and derives terminal legality from recipe actions rather than a
+hard-coded phase counter. Ruin replacement remains server-owned and never
+exceeds the validated 16-object physical cap.

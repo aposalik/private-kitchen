@@ -5,7 +5,9 @@ import {
   MAX_INGREDIENT_COUNT,
   MAX_RECIPE_DURATION_MS,
   MAX_RECIPE_ID_LENGTH,
+  MAX_TOTAL_INGREDIENT_OBJECTS,
   TOMATO_SOUP_RECIPE,
+  diagnoseRecipe,
   validateRecipe,
   validateRecipeJson,
 } from "../src/index.js";
@@ -32,6 +34,26 @@ const validRecipe = {
 };
 
 describe("versioned recipe schema", () => {
+  test("accepts bounded custom slugs and returns structured diagnostics for unsafe documents", () => {
+    expect(validateRecipe({ ...validRecipe, id: "garden-soup-2" }).success).toBe(true);
+
+    const diagnostics = diagnoseRecipe({
+      ...validRecipe,
+      id: "Garden Soup",
+      ingredients: validRecipe.ingredients.map((ingredient) => ({
+        ...ingredient,
+        count: MAX_TOTAL_INGREDIENT_OBJECTS,
+      })),
+    });
+
+    expect(diagnostics.valid).toBe(false);
+    expect(diagnostics.issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "id", code: expect.any(String) }),
+      expect.objectContaining({ path: "ingredients", code: "too_many_objects" }),
+    ]));
+    expect(diagnostics.issues.every((issue) => !("input" in issue))).toBe(true);
+  });
+
   test("accepts a valid version 1 recipe", () => {
     expect(validateRecipe(validRecipe).success).toBe(true);
   });
@@ -48,9 +70,9 @@ describe("versioned recipe schema", () => {
     }).success).toBe(false);
   });
 
-  test("rejects unsupported recipe IDs, ingredient kinds, actions, and schema versions", () => {
+  test("rejects malformed recipe IDs, unsupported ingredient kinds, actions, and schema versions", () => {
     expect(validateRecipe({ ...validRecipe, schemaVersion: 2 }).success).toBe(false);
-    expect(validateRecipe({ ...validRecipe, id: "mystery-stew" }).success).toBe(false);
+    expect(validateRecipe({ ...validRecipe, id: "Mystery Stew" }).success).toBe(false);
     expect(validateRecipe({
       ...validRecipe,
       ingredients: [{ ...validRecipe.ingredients[0], kind: "MUSHROOM" }, validRecipe.ingredients[1]],
@@ -89,6 +111,21 @@ describe("versioned recipe schema", () => {
     expect(validateRecipe({
       ...validRecipe,
       steps: [validRecipe.steps[0], { ...validRecipe.steps[1], id: "chop-tomato" }, ...validRecipe.steps.slice(2)],
+    }).success).toBe(false);
+  });
+
+  test("rejects duplicate physical ingredient kinds with different IDs", () => {
+    expect(validateRecipe({
+      ...validRecipe,
+      ingredients: [
+        validRecipe.ingredients[0],
+        { ...validRecipe.ingredients[1], id: "second-tomato", kind: "TOMATO" },
+      ],
+      steps: validRecipe.steps.map((step) =>
+        step.ingredientId === "onion"
+          ? { ...step, ingredientId: "second-tomato" }
+          : step
+      ),
     }).success).toBe(false);
   });
 

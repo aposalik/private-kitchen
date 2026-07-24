@@ -40,6 +40,31 @@ git diff --check
 
 Use `npm.cmd` in place of `npm` on Windows when required.
 
+## Phase 6 browser and mobile coverage
+
+Playwright avoids multiplying the expensive multiplayer regression: `chromium`
+owns the full suite, Firefox and WebKit run only `browser-support.spec.ts`, and
+emulated Pixel Chrome and iPhone WebKit run only `mobile-layout.spec.ts`.
+`npm run test:e2e` rebuilds production assets automatically; direct `npx.cmd
+playwright test ...` commands serve the existing `dist`, so run `npm run build`
+first after source changes. CI installs Chromium, Firefox, and WebKit in a
+separate `e2e` job and runs the same rebuilding root script.
+
+```bash
+npx.cmd playwright test --list
+npx.cmd playwright test tests/e2e/browser-support.spec.ts --project=firefox
+npx.cmd playwright test tests/e2e/browser-support.spec.ts --project=webkit
+npx.cmd playwright test tests/e2e/mobile-layout.spec.ts --project=mobile-chrome
+npx.cmd playwright test tests/e2e/mobile-layout.spec.ts --project=mobile-safari
+```
+
+The production servers retain the unique per-run SQLite directory and
+process-exit cleanup. Explicit smoke/mobile contexts close after failure.
+Device emulation and Playwright WebKit are compatibility evidence only. Real
+iOS/Android touch, safe-area, fullscreen, reconnect, microphone, speaker, and
+three-device LAN checks remain the pending completion gate in
+`docs/browser-support.md`.
+
 ## Phase 5 database and account coverage
 
 Use an isolated SQLite path for local migrations:
@@ -63,6 +88,61 @@ with `?player=Two&room=ROOM_ID` and `?player=Three&room=ROOM_ID`. Query options
 only prefill the client; all authorization remains on the server. Real voice
 usability, gestures, and the communication matrix remain Phase 3 scope.
 
+For Phase 6, use current physical iOS Safari and Android Chrome in landscape;
+responsive desktop mode and Playwright emulation do not satisfy this gate.
+Record versions and evidence in `docs/browser-support.md`.
+
 ## Production migration lifecycle
 
 `npm run start --workspace @cooking-game/server` runs `prisma migrate deploy` through `prestart` before launching `dist/index.js`. Production Chromium uses this same path with a unique temporary SQLite directory; after Playwright terminates its web servers, process-exit cleanup removes the database and every journal/WAL sidecar. It must not use the test-only in-memory bootstrap path.
+
+## Phase 7 playtest UI and evidence coverage
+
+Client DOM tests cover all role/phase briefings, semantic guidance, setup versus
+Operate visibility, stable view-state attributes, terminal ordering, monotonic
+running-duration observation, accessible structured controls, duplicate
+submission prevention, strict runtime validation, malformed storage, the
+30-record cap, deterministic export, and key-scoped clear.
+
+The existing Chromium Tomato Soup scenario—not a new multiplayer scenario—also
+checks role briefings, inactive setup, unchanged permissions/privacy, a
+terminal debrief for all roles, and the single local feedback key. The existing
+mobile Chrome/WebKit scenarios check that role, objective, timer, progress, and
+an entire 44px action target fit inside the first landscape viewport with no
+horizontal overflow. The Phase 6 matrix remains scoped as before.
+
+Automation cannot establish enjoyment, participation quality, frustration,
+physical communication quality, or replay intent. Follow
+`docs/playtesting.md` and `docs/playtest-session-template.md`; until several
+real three-person role-rotated sessions are complete, the human gate is
+pending.
+
+## Phase 8 recipe coverage
+
+Focused suites cover custom slugs, deep physical/graph bounds and sanitized
+diagnostics; migration-backed lifecycle, public filtering, reports, and hashed
+single-use tokens; API ownership, licenses, privacy, moderation, origins,
+payloads, and rate limits; and a real custom-recipe Colyseus room proving
+inventory, timer, private delivery, public-state exclusion, history, and invalid
+selection rejection. Client DOM tests cover structured generation, focusable
+diagnostics, explicit licenses, discovery launch, and custom terminal progress.
+
+The post-implementation authority regression uses a valid 16-object custom
+recipe. It proves exact recipe-only provisioning, dependency-first rejection,
+quantity-derived progress, and a ruin/replacement cycle that remains capped at
+16 objects. Migration exercises cover fresh installation and an upgrade from a
+Phase 5 database through all four migrations; the upgrade asserts preserved
+records, safe draft defaults, and a required test snapshot with no default.
+
+Final automated evidence on 2026-07-24: 274/274 repository tests, all five
+workspace typechecks, ordered production build, `git diff --check`, and 9/9
+Playwright cases across Chromium, Firefox, WebKit, emulated Pixel Chrome, and
+emulated iPhone WebKit. `npm audit --omit=dev --audit-level=high` still reports
+three high advisories in Prisma development tooling through `find-my-way`; the
+offered fix is a forced breaking Prisma downgrade and no reachable production
+game-server path was established. This is documented, not represented as a
+clean audit.
+
+Human moderation decisions and a real exactly-three-person custom-recipe
+playtest remain manual gates. Do not fabricate either. Playtest feedback remains
+browser-local under the Phase 7 bounded key and is never submitted by Phase 8.

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import {
   COMMUNICATION_MESSAGES,
-  MAX_ACTIVE_VOICE_EDGES,
+
   MAX_BOARD_STROKES,
   MAX_ICE_CANDIDATES_PER_EDGE_AND_PEER,
   MAX_SDP_LENGTH,
@@ -126,27 +126,32 @@ describe("Phase 3 authoritative communication", () => {
     expect(grants).toEqual(new Map([
       ["BLIND_COOK", { canPublish: true, canReceive: true }],
       ["RECIPE_KEEPER", { canPublish: false, canReceive: true }],
-      ["DEAF_KITCHEN_GUIDE", { canPublish: true, canReceive: false }],
+      ["DEAF_KITCHEN_GUIDE", { canPublish: false, canReceive: false }],
     ]));
 
-    const readyRelay = nextMessage<VoiceRelayEnvelope>(byRole.DEAF_KITCHEN_GUIDE, COMMUNICATION_MESSAGES.voiceRelay);
-    byRole.RECIPE_KEEPER.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: byRole.DEAF_KITCHEN_GUIDE.sessionId, clientSequence: 1 });
+    const readyRelay = nextMessage<VoiceRelayEnvelope>(byRole.BLIND_COOK, COMMUNICATION_MESSAGES.voiceRelay);
+    byRole.RECIPE_KEEPER.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: byRole.BLIND_COOK.sessionId, clientSequence: 1 });
     await expect(readyRelay).resolves.toMatchObject({ kind: "READY", senderRole: "RECIPE_KEEPER", senderId: byRole.RECIPE_KEEPER.sessionId });
 
     const offerRelay = nextMessage<VoiceRelayEnvelope>(byRole.RECIPE_KEEPER, COMMUNICATION_MESSAGES.voiceRelay);
-    byRole.DEAF_KITCHEN_GUIDE.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: byRole.RECIPE_KEEPER.sessionId, clientSequence: 1, sdp: SENDONLY_AUDIO_OFFER_SDP });
+    byRole.BLIND_COOK.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: byRole.RECIPE_KEEPER.sessionId, clientSequence: 1, sdp: SENDONLY_AUDIO_OFFER_SDP });
     const offer = await offerRelay;
-    expect(offer).toMatchObject({ kind: "OFFER", senderRole: "DEAF_KITCHEN_GUIDE", sdp: SENDONLY_AUDIO_OFFER_SDP });
-    const answerRelay = nextMessage<VoiceRelayEnvelope>(byRole.DEAF_KITCHEN_GUIDE, COMMUNICATION_MESSAGES.voiceRelay);
-    byRole.RECIPE_KEEPER.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ANSWER", targetId: byRole.DEAF_KITCHEN_GUIDE.sessionId, clientSequence: 2, offerId: offer.offerId, sdp: RECVONLY_AUDIO_ANSWER_SDP });
+    expect(offer).toMatchObject({ kind: "OFFER", senderRole: "BLIND_COOK", sdp: SENDONLY_AUDIO_OFFER_SDP });
+    const answerRelay = nextMessage<VoiceRelayEnvelope>(byRole.BLIND_COOK, COMMUNICATION_MESSAGES.voiceRelay);
+    byRole.RECIPE_KEEPER.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ANSWER", targetId: byRole.BLIND_COOK.sessionId, clientSequence: 2, offerId: offer.offerId, sdp: RECVONLY_AUDIO_ANSWER_SDP });
     await expect(answerRelay).resolves.toMatchObject({ kind: "ANSWER", offerId: offer.offerId });
     const iceRelay = nextMessage<VoiceRelayEnvelope>(byRole.RECIPE_KEEPER, COMMUNICATION_MESSAGES.voiceRelay);
-    byRole.DEAF_KITCHEN_GUIDE.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: byRole.RECIPE_KEEPER.sessionId, clientSequence: 2, offerId: offer.offerId, candidate: "candidate:1" });
+    byRole.BLIND_COOK.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: byRole.RECIPE_KEEPER.sessionId, clientSequence: 2, offerId: offer.offerId, candidate: "candidate:1" });
     await expect(iceRelay).resolves.toMatchObject({ kind: "ICE", candidate: "candidate:1" });
 
     const unauthorized = nextMessage<CommunicationErrorPayload>(byRole.RECIPE_KEEPER, COMMUNICATION_MESSAGES.error);
     byRole.RECIPE_KEEPER.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: byRole.BLIND_COOK.sessionId, clientSequence: 3, sdp: SENDONLY_AUDIO_OFFER_SDP });
     await expect(unauthorized).resolves.toMatchObject({ code: "VOICE_NOT_AUTHORIZED" });
+    const silentGuide = nextMessage<CommunicationErrorPayload>(byRole.DEAF_KITCHEN_GUIDE, COMMUNICATION_MESSAGES.error);
+    await expectNoMessage(byRole.RECIPE_KEEPER, COMMUNICATION_MESSAGES.voiceRelay, () => {
+      byRole.DEAF_KITCHEN_GUIDE.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: byRole.RECIPE_KEEPER.sessionId, clientSequence: 1, sdp: SENDONLY_AUDIO_OFFER_SDP });
+    });
+    await expect(silentGuide).resolves.toMatchObject({ code: "VOICE_NOT_AUTHORIZED" });
     const oversized = nextMessage<CommunicationErrorPayload>(byRole.BLIND_COOK, COMMUNICATION_MESSAGES.error);
     byRole.BLIND_COOK.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: byRole.RECIPE_KEEPER.sessionId, clientSequence: 1, sdp: "x".repeat(MAX_SDP_LENGTH + 1) });
     await expect(oversized).resolves.toMatchObject({ code: "INVALID_PAYLOAD" });
@@ -179,7 +184,7 @@ describe("Phase 3 authoritative communication", () => {
   test("voice SDP direction failures are sender-only and never relay", async () => {
     const byRole = await readyRoom();
     const receiver = byRole.RECIPE_KEEPER;
-    const publisher = byRole.DEAF_KITCHEN_GUIDE;
+    const publisher = byRole.BLIND_COOK;
     const ready = nextMessage<VoiceRelayEnvelope>(publisher, COMMUNICATION_MESSAGES.voiceRelay);
     receiver.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: publisher.sessionId, clientSequence: 1 });
     await ready;
@@ -223,7 +228,7 @@ describe("Phase 3 authoritative communication", () => {
   test("DISABLE revokes only the authoritative sender and notifies involved peers", async () => {
     const byRole = await readyRoom();
     const recipe = byRole.RECIPE_KEEPER;
-    const deaf = byRole.DEAF_KITCHEN_GUIDE;
+    const deaf = byRole.BLIND_COOK;
     recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: deaf.sessionId, clientSequence: 1 });
     await nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
 
@@ -238,67 +243,61 @@ describe("Phase 3 authoritative communication", () => {
     await expect(error).resolves.toMatchObject({ code: "VOICE_NOT_READY" });
   });
 
-  test("READY ordering, pair supersession, global edge bound, and ICE burst bounds are enforced", async () => {
+  test("silent Guide policy, READY ordering, pair supersession, and ICE burst bounds are enforced", async () => {
     const byRole = await readyRoom();
     const blind = byRole.BLIND_COOK;
     const recipe = byRole.RECIPE_KEEPER;
-    const deaf = byRole.DEAF_KITCHEN_GUIDE;
+    const guide = byRole.DEAF_KITCHEN_GUIDE;
 
-    const notReadyError = nextMessage<CommunicationErrorPayload>(deaf, COMMUNICATION_MESSAGES.error);
+    const guideError = nextMessage<CommunicationErrorPayload>(guide, COMMUNICATION_MESSAGES.error);
     await expectNoMessage(recipe, COMMUNICATION_MESSAGES.voiceRelay, () => {
-      deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 1, sdp: SENDONLY_AUDIO_OFFER_SDP });
+      guide.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 1, sdp: SENDONLY_AUDIO_OFFER_SDP });
+    });
+    await expect(guideError).resolves.toMatchObject({ code: "VOICE_NOT_AUTHORIZED" });
+
+    const notReadyError = nextMessage<CommunicationErrorPayload>(blind, COMMUNICATION_MESSAGES.error);
+    await expectNoMessage(recipe, COMMUNICATION_MESSAGES.voiceRelay, () => {
+      blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 1, sdp: SENDONLY_AUDIO_OFFER_SDP });
     });
     await expect(notReadyError).resolves.toMatchObject({ code: "VOICE_NOT_READY" });
 
-    recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: deaf.sessionId, clientSequence: 1 });
-    await nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
+    recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: blind.sessionId, clientSequence: 1 });
+    await nextMessage<VoiceRelayEnvelope>(blind, COMMUNICATION_MESSAGES.voiceRelay);
     const firstPromise = nextMessage<VoiceRelayEnvelope>(recipe, COMMUNICATION_MESSAGES.voiceRelay);
-    deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 2, sdp: SENDONLY_AUDIO_OFFER_SDP });
+    blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 2, sdp: SENDONLY_AUDIO_OFFER_SDP });
     const first = await firstPromise;
     const replacementPromise = nextMessage<VoiceRelayEnvelope>(recipe, COMMUNICATION_MESSAGES.voiceRelay);
-    deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 3, sdp: SENDONLY_AUDIO_OFFER_SDP });
+    blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 3, sdp: SENDONLY_AUDIO_OFFER_SDP });
     const replacement = await replacementPromise;
     expect(replacement.offerId).not.toBe(first.offerId);
 
     const staleAnswer = nextMessage<CommunicationErrorPayload>(recipe, COMMUNICATION_MESSAGES.error);
-    recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ANSWER", targetId: deaf.sessionId, clientSequence: 2, offerId: first.offerId, sdp: RECVONLY_AUDIO_ANSWER_SDP });
+    recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ANSWER", targetId: blind.sessionId, clientSequence: 2, offerId: first.offerId, sdp: RECVONLY_AUDIO_ANSWER_SDP });
     await expect(staleAnswer).resolves.toMatchObject({ code: "VOICE_EDGE_NOT_FOUND" });
-    const staleIce = nextMessage<CommunicationErrorPayload>(deaf, COMMUNICATION_MESSAGES.error);
-    deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: recipe.sessionId, clientSequence: 4, offerId: first.offerId, candidate: "candidate:stale" });
+    const staleIce = nextMessage<CommunicationErrorPayload>(blind, COMMUNICATION_MESSAGES.error);
+    blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: recipe.sessionId, clientSequence: 4, offerId: first.offerId, candidate: "candidate:stale" });
     await expect(staleIce).resolves.toMatchObject({ code: "VOICE_EDGE_NOT_FOUND" });
 
-    const answerRelay = nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
-    recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ANSWER", targetId: deaf.sessionId, clientSequence: 3, offerId: replacement.offerId, sdp: RECVONLY_AUDIO_ANSWER_SDP });
+    const answerRelay = nextMessage<VoiceRelayEnvelope>(blind, COMMUNICATION_MESSAGES.voiceRelay);
+    recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ANSWER", targetId: blind.sessionId, clientSequence: 3, offerId: replacement.offerId, sdp: RECVONLY_AUDIO_ANSWER_SDP });
     await answerRelay;
 
     const iceRelays: VoiceRelayEnvelope[] = [];
     recipe.onMessage(COMMUNICATION_MESSAGES.voiceRelay, (relay) => { if ((relay as VoiceRelayEnvelope).kind === "ICE") iceRelays.push(relay as VoiceRelayEnvelope); });
     for (let index = 0; index < MAX_ICE_CANDIDATES_PER_EDGE_AND_PEER; index += 1) {
-      deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: recipe.sessionId, clientSequence: 5 + index, offerId: replacement.offerId, candidate: `candidate:${index}` });
+      blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: recipe.sessionId, clientSequence: 5 + index, offerId: replacement.offerId, candidate: `candidate:${index}` });
     }
     await waitFor(() => iceRelays.length === MAX_ICE_CANDIDATES_PER_EDGE_AND_PEER);
-    const capped = nextMessage<CommunicationErrorPayload>(deaf, COMMUNICATION_MESSAGES.error);
-    deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: recipe.sessionId, clientSequence: 5 + MAX_ICE_CANDIDATES_PER_EDGE_AND_PEER, offerId: replacement.offerId, candidate: "candidate:overflow" });
+    const capped = nextMessage<CommunicationErrorPayload>(blind, COMMUNICATION_MESSAGES.error);
+    blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: recipe.sessionId, clientSequence: 5 + MAX_ICE_CANDIDATES_PER_EDGE_AND_PEER, offerId: replacement.offerId, candidate: "candidate:overflow" });
     await expect(capped).resolves.toMatchObject({ code: "RATE_LIMITED" });
     expect(iceRelays).toHaveLength(MAX_ICE_CANDIDATES_PER_EDGE_AND_PEER);
-
-    const blindReadyRelay = nextMessage<VoiceRelayEnvelope>(blind, COMMUNICATION_MESSAGES.voiceRelay);
-    const deafReadyRelay = nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
-    recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: blind.sessionId, clientSequence: 4 });
-    blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: deaf.sessionId, clientSequence: 1 });
-    await Promise.all([blindReadyRelay, deafReadyRelay]);
-    const toRecipe = nextMessage<VoiceRelayEnvelope>(recipe, COMMUNICATION_MESSAGES.voiceRelay);
-    blind.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: recipe.sessionId, clientSequence: 2, sdp: SENDONLY_AUDIO_OFFER_SDP });
-    const toBlind = nextMessage<VoiceRelayEnvelope>(blind, COMMUNICATION_MESSAGES.voiceRelay);
-    deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "OFFER", targetId: blind.sessionId, clientSequence: 6 + MAX_ICE_CANDIDATES_PER_EDGE_AND_PEER, sdp: SENDONLY_AUDIO_OFFER_SDP });
-    await Promise.all([toRecipe, toBlind]);
-    expect(MAX_ACTIVE_VOICE_EDGES).toBe(3);
   });
 
   test("unanswered and established voice edges expire", async () => {
     const byRole = await readyRoom(undefined, undefined, { voicePendingEdgeTtlMs: 80, voiceEstablishedEdgeTtlMs: 100 });
     const recipe = byRole.RECIPE_KEEPER;
-    const deaf = byRole.DEAF_KITCHEN_GUIDE;
+    const deaf = byRole.BLIND_COOK;
     recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: deaf.sessionId, clientSequence: 1 });
     await nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
     const offerPromise = nextMessage<VoiceRelayEnvelope>(recipe, COMMUNICATION_MESSAGES.voiceRelay);
@@ -307,7 +306,7 @@ describe("Phase 3 authoritative communication", () => {
     const pendingPublisherDisabled = nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
     const pendingReceiverDisabled = nextMessage<VoiceRelayEnvelope>(recipe, COMMUNICATION_MESSAGES.voiceRelay);
     await expect(pendingPublisherDisabled).resolves.toMatchObject({ kind: "DISABLED", senderId: recipe.sessionId, senderRole: "RECIPE_KEEPER" });
-    await expect(pendingReceiverDisabled).resolves.toMatchObject({ kind: "DISABLED", senderId: deaf.sessionId, senderRole: "DEAF_KITCHEN_GUIDE" });
+    await expect(pendingReceiverDisabled).resolves.toMatchObject({ kind: "DISABLED", senderId: deaf.sessionId, senderRole: "BLIND_COOK" });
     const pendingError = nextMessage<CommunicationErrorPayload>(recipe, COMMUNICATION_MESSAGES.error);
     recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ANSWER", targetId: deaf.sessionId, clientSequence: 2, offerId: expiredPending.offerId, sdp: RECVONLY_AUDIO_ANSWER_SDP });
     await expect(pendingError).resolves.toMatchObject({ code: "VOICE_EDGE_NOT_FOUND" });
@@ -321,7 +320,7 @@ describe("Phase 3 authoritative communication", () => {
     const establishedPublisherDisabled = nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
     const establishedReceiverDisabled = nextMessage<VoiceRelayEnvelope>(recipe, COMMUNICATION_MESSAGES.voiceRelay);
     await expect(establishedPublisherDisabled).resolves.toMatchObject({ kind: "DISABLED", senderId: recipe.sessionId, senderRole: "RECIPE_KEEPER" });
-    await expect(establishedReceiverDisabled).resolves.toMatchObject({ kind: "DISABLED", senderId: deaf.sessionId, senderRole: "DEAF_KITCHEN_GUIDE" });
+    await expect(establishedReceiverDisabled).resolves.toMatchObject({ kind: "DISABLED", senderId: deaf.sessionId, senderRole: "BLIND_COOK" });
     const establishedError = nextMessage<CommunicationErrorPayload>(deaf, COMMUNICATION_MESSAGES.error);
     deaf.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "ICE", targetId: recipe.sessionId, clientSequence: 3, offerId: established.offerId, candidate: "candidate:late" });
     await expect(establishedError).resolves.toMatchObject({ code: "VOICE_EDGE_NOT_FOUND" });
@@ -330,13 +329,13 @@ describe("Phase 3 authoritative communication", () => {
   test("voice readiness expires and authoritatively revokes both endpoints", async () => {
     const byRole = await readyRoom(undefined, undefined, { voicePendingEdgeTtlMs: 1_000, voiceEstablishedEdgeTtlMs: 1_000, voiceReadinessTtlMs: 80 });
     const recipe = byRole.RECIPE_KEEPER;
-    const deaf = byRole.DEAF_KITCHEN_GUIDE;
+    const deaf = byRole.BLIND_COOK;
     recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: deaf.sessionId, clientSequence: 1 });
     await nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
     const publisherRevoked = nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
     const receiverRevoked = nextMessage<VoiceRelayEnvelope>(recipe, COMMUNICATION_MESSAGES.voiceRelay);
     await expect(publisherRevoked).resolves.toMatchObject({ kind: "DISABLED", senderId: recipe.sessionId, senderRole: "RECIPE_KEEPER" });
-    await expect(receiverRevoked).resolves.toMatchObject({ kind: "DISABLED", senderId: deaf.sessionId, senderRole: "DEAF_KITCHEN_GUIDE" });
+    await expect(receiverRevoked).resolves.toMatchObject({ kind: "DISABLED", senderId: deaf.sessionId, senderRole: "BLIND_COOK" });
 
     const error = nextMessage<CommunicationErrorPayload>(deaf, COMMUNICATION_MESSAGES.error);
     await expectNoMessage(recipe, COMMUNICATION_MESSAGES.voiceRelay, () => {
@@ -348,7 +347,7 @@ describe("Phase 3 authoritative communication", () => {
   test("receiver reconnect clears readiness and requires a fresh bounded handshake", async () => {
     const byRole = await readyRoom(2);
     const recipe = byRole.RECIPE_KEEPER;
-    const deaf = byRole.DEAF_KITCHEN_GUIDE;
+    const deaf = byRole.BLIND_COOK;
     const readyRelay = nextMessage<VoiceRelayEnvelope>(deaf, COMMUNICATION_MESSAGES.voiceRelay);
     recipe.send(COMMUNICATION_MESSAGES.voiceSignal, { kind: "READY", targetId: deaf.sessionId, clientSequence: 1 });
     await readyRelay;

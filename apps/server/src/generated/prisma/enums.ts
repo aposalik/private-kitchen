@@ -9,7 +9,38 @@
 * 🟢 You can import this file directly.
 */
 
+export const RecipeStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  REMOVED: 'REMOVED'
+} as const
+
+export type RecipeStatus = (typeof RecipeStatus)[keyof typeof RecipeStatus]
 
 
-// This file is empty because there are no enums in the schema.
-export {}
+export const RecipeLicense = {
+  CC0_1_0: 'CC0_1_0',
+  CC_BY_4_0: 'CC_BY_4_0'
+} as const
+
+export type RecipeLicense = (typeof RecipeLicense)[keyof typeof RecipeLicense]
+
+
+export const RecipeReportReason = {
+  HATE_OR_HARASSMENT: 'HATE_OR_HARASSMENT',
+  SEXUAL_CONTENT: 'SEXUAL_CONTENT',
+  VIOLENCE: 'VIOLENCE',
+  SPAM: 'SPAM',
+  COPYRIGHT: 'COPYRIGHT',
+  OTHER: 'OTHER'
+} as const
+
+export type RecipeReportReason = (typeof RecipeReportReason)[keyof typeof RecipeReportReason]
+
+
+export const ReportStatus = {
+  OPEN: 'OPEN',
+  RESOLVED: 'RESOLVED'
+} as const
+
+export type ReportStatus = (typeof ReportStatus)[keyof typeof ReportStatus]

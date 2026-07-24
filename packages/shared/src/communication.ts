@@ -103,7 +103,7 @@ export interface VoiceGrant { canPublish: boolean; canReceive: boolean }
 export const VOICE_GRANTS: Readonly<Record<PlayerRole, VoiceGrant>> = {
   BLIND_COOK: { canPublish: true, canReceive: true },
   RECIPE_KEEPER: { canPublish: false, canReceive: true },
-  DEAF_KITCHEN_GUIDE: { canPublish: true, canReceive: false },
+  DEAF_KITCHEN_GUIDE: { canPublish: false, canReceive: false },
 };
 
 export interface ServerEnvelope { senderId: string; senderRole: PlayerRole; sequence: number; timestamp: number }

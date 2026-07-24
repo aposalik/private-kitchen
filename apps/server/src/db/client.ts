@@ -14,13 +14,16 @@ export function createDatabaseClient(
 
 /** Applies the checked-in initial schema to a new isolated database. */
 export async function migrateDatabase(database: DatabaseClient): Promise<void> {
-  const migrationUrl = new URL(
-    "../../prisma/migrations/20260722170000_phase5_accounts/migration.sql",
-    import.meta.url,
-  );
-  const sql = await readFile(migrationUrl, "utf8");
-  for (const statement of sql.split(";").map((part) => part.trim()).filter(Boolean)) {
-    await database.$executeRawUnsafe(statement);
+  for (const migration of [
+    "20260722170000_phase5_accounts",
+    "20260724103000_phase8_user_recipes",
+    "20260724111500_phase8_snapshot_pinning",
+  ]) {
+    const migrationUrl = new URL(`../../prisma/migrations/${migration}/migration.sql`, import.meta.url);
+    const sql = await readFile(migrationUrl, "utf8");
+    for (const statement of sql.split(";").map((part) => part.trim()).filter(Boolean)) {
+      await database.$executeRawUnsafe(statement);
+    }
   }
 }
 
@@ -38,7 +41,7 @@ export async function ensureDatabaseSchema(
   }
   if (names.has("Account") && names.has("_prisma_migrations")) {
     const applied = await database.$queryRawUnsafe<Array<{ migration_name: string }>>(
-      "SELECT migration_name FROM _prisma_migrations WHERE migration_name = '20260722170000_phase5_accounts' AND finished_at IS NOT NULL AND rolled_back_at IS NULL",
+      "SELECT migration_name FROM _prisma_migrations WHERE migration_name = '20260724111500_phase8_snapshot_pinning' AND finished_at IS NOT NULL AND rolled_back_at IS NULL",
     );
     if (applied.length === 1) return;
   }

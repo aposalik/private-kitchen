@@ -2,6 +2,12 @@ import { type AuthContext, type Client, ErrorCode, Room, ServerError } from "@co
 import { defineTypes, MapSchema, Schema } from "@colyseus/schema";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  TOMATO_SOUP_RECIPE,
+  recipeIdSchema,
+  recipeSchema,
+  type Recipe,
+} from "@cooking-game/recipe-schema";
 
 import {
   KITCHEN_MESSAGES,
@@ -30,8 +36,11 @@ import type { NewGameHistory } from "../db/repository.js";
 const joinOptionsSchema = z
   .object({
     displayName: z.string().trim().min(1).max(32),
+    recipeId: z.string().min(1).max(64).optional(),
+    recipeTestToken: z.string().min(20).max(128).optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => !(value.recipeId && value.recipeTestToken));
 
 const objectIdSchema = z.string().trim().min(1).max(MAX_OBJECT_ID_LENGTH);
 const pickUpPayloadSchema = z.object({ objectId: objectIdSchema }).strict();
@@ -115,7 +124,14 @@ export interface KitchenRoomOptions {
   now?: () => Date;
   resolveAuthCookie?: (cookieHeader: string | undefined) => Promise<RoomAccountAuth | undefined>;
   recordGameHistory?: (history: NewGameHistory) => Promise<boolean>;
+  resolveRecipeSelection?: (selection: RecipeSelection) => Promise<Recipe | undefined>;
+  recipeId?: string;
+  recipeTestToken?: string;
 }
+
+export type RecipeSelection =
+  | { kind: "PUBLIC"; recipeId: string }
+  | { kind: "PRIVATE_TEST"; token: string };
 
 interface RoomAccountAuth {
   accountId: string;
@@ -139,6 +155,7 @@ export class KitchenRoom extends Room {
   private resolveAuthCookie: KitchenRoomOptions["resolveAuthCookie"];
   private recordGameHistory: KitchenRoomOptions["recordGameHistory"];
   private roundDurationMs = 300_000;
+  private resolvedRecipe: Recipe = recipeSchema.parse(TOMATO_SOUP_RECIPE);
   private readonly accountBySession = new Map<string, RoomAccountAuth>();
   private readonly historyWrites = new Map<string, Promise<boolean>>();
 
@@ -146,7 +163,20 @@ export class KitchenRoom extends Room {
     this.now = options.now ?? (() => new Date());
     this.resolveAuthCookie = options.resolveAuthCookie;
     this.recordGameHistory = options.recordGameHistory;
-    this.roundDurationMs = options.roundDurationMs ?? 300_000;
+    const selection = parseRecipeSelection(options);
+    if (selection) {
+      const resolved = await options.resolveRecipeSelection?.(selection);
+      if (!resolved) {
+        throw new ServerError(ErrorCode.APPLICATION_ERROR, "Recipe selection is unavailable");
+      }
+      this.resolvedRecipe = resolved;
+    }
+    this.roundDurationMs = selection
+      ? this.resolvedRecipe.roundDurationMs
+      : options.roundDurationMs ?? this.resolvedRecipe.roundDurationMs;
+    if (!selection && options.roundDurationMs) {
+      this.resolvedRecipe = { ...this.resolvedRecipe, roundDurationMs: options.roundDurationMs };
+    }
     if (
       typeof options.reconnectionGraceSeconds === "number" &&
       Number.isFinite(options.reconnectionGraceSeconds) &&
@@ -156,21 +186,28 @@ export class KitchenRoom extends Room {
     }
 
     this.state.placementSeed = options.placementSeed ?? randomUUID();
-    for (const initial of createInitialKitchenObjects(this.state.placementSeed)) {
-      const object = new KitchenObject();
-      object.id = initial.id;
-      object.kind = initial.kind;
-      object.label = initial.label;
-      object.x = initial.x;
-      object.y = initial.y;
-      object.preparation = initial.preparation;
-      object.location = initial.location;
-      this.state.objects.set(object.id, object);
+    let objectSequence = 0;
+    for (const ingredient of this.resolvedRecipe.ingredients) {
+      for (let index = 0; index < ingredient.count; index += 1) {
+        const initial = createInitialKitchenObjects(
+          `${this.state.placementSeed}:recipe:${ingredient.kind}:${index}`,
+        ).find(({ kind }) => kind === ingredient.kind)!;
+        objectSequence += 1;
+        const object = new KitchenObject();
+        object.id = `ingredient-${objectSequence}`;
+        object.kind = initial.kind;
+        object.label = initial.label;
+        object.x = initial.x;
+        object.y = initial.y;
+        object.preparation = initial.preparation;
+        object.location = initial.location;
+        this.state.objects.set(object.id, object);
+      }
     }
 
     this.cooking = new CookingSystem(this.state, {
       placementSeed: this.state.placementSeed,
-      ...(options.roundDurationMs ? { roundDurationMs: options.roundDurationMs } : {}),
+      recipe: this.resolvedRecipe,
       createObject: () => new KitchenObject(),
       onTerminal: () => this.recordTerminalHistory(),
     });
@@ -181,7 +218,7 @@ export class KitchenRoom extends Room {
     this.recipe = new RecipeSystem(this, {
       roleOf: (sessionId) => this.state.players.get(sessionId)?.role,
       roundStarted: () => this.state.roundStatus !== "NOT_STARTED",
-    });
+    }, this.resolvedRecipe);
     this.recipe.register();
 
     this.onMessage(KITCHEN_MESSAGES.pickUp, (client, payload: unknown) => {
@@ -218,7 +255,7 @@ export class KitchenRoom extends Room {
       );
     }
 
-    const options: KitchenJoinOptions = parsedOptions.data;
+    const options: KitchenJoinOptions = { displayName: parsedOptions.data.displayName };
     const role = this.nextAvailableRole();
 
     if (!role) {
@@ -301,7 +338,8 @@ export class KitchenRoom extends Room {
         accountId,
         roundId: `${this.roomId}:1`,
         roomId: this.roomId,
-        recipeId: "tomato-soup",
+        recipeId: this.resolvedRecipe.id,
+        recipeSnapshotJson: JSON.stringify(this.resolvedRecipe),
         outcome,
         outcomeReason: this.state.outcomeReason,
         completedStepCount: this.state.completedStepCount,
@@ -424,4 +462,21 @@ export class KitchenRoom extends Room {
       this.state.connectedCount === REQUIRED_PLAYER_COUNT ? "READY" : "WAITING";
     if (wasReady && this.state.status !== "READY") this.communication.roomReadinessChanged(false);
   }
+}
+
+function parseRecipeSelection(options: KitchenRoomOptions): RecipeSelection | undefined {
+  if (options.recipeId !== undefined && options.recipeTestToken !== undefined) {
+    throw new ServerError(ErrorCode.APPLICATION_ERROR, "Choose one recipe selection");
+  }
+  if (options.recipeId !== undefined) {
+    const parsed = recipeIdSchema.safeParse(options.recipeId);
+    if (!parsed.success) throw new ServerError(ErrorCode.APPLICATION_ERROR, "Invalid recipe selection");
+    return { kind: "PUBLIC", recipeId: parsed.data };
+  }
+  if (options.recipeTestToken !== undefined) {
+    const parsed = z.string().min(20).max(128).regex(/^[A-Za-z0-9_-]+$/).safeParse(options.recipeTestToken);
+    if (!parsed.success) throw new ServerError(ErrorCode.APPLICATION_ERROR, "Invalid recipe selection");
+    return { kind: "PRIVATE_TEST", token: parsed.data };
+  }
+  return undefined;
 }

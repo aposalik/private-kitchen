@@ -204,10 +204,12 @@ describe("Phase 4 finite cooking protocol", () => {
       ],
     } as const;
     expect(parsePrivateRecipe(valid)).toEqual(valid);
+    expect(parsePrivateRecipe({ ...valid, id: "garden-soup", title: "Garden Soup" }))
+      .toMatchObject({ id: "garden-soup", title: "Garden Soup" });
 
     for (const malformed of [
-      { ...valid, id: "mystery-stew" },
-      { ...valid, title: "Forged Soup" },
+      { ...valid, id: "Mystery Stew" },
+      { ...valid, title: "" },
       { ...valid, role: "RECIPE_KEEPER" },
       { ...valid, senderId: "player-1" },
       { ...valid, remainingMs: 10 },

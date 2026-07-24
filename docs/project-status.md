@@ -2,7 +2,85 @@
 
 ## Current phase
 
-Phase 5 — Accounts and persistence: implemented, independently reviewed, and verified.
+Phase 8 — User-created recipes: implementation and automated verification
+complete; human moderation, physical-device, and exactly-three-person playtest
+gates pending. Phase 7's human playtest gate also remains pending.
+
+## Phase 8 final automated verification — 2026-07-24
+
+- immutable publication, private-test, active-room, and historical recipe
+  snapshots, with Recipe Keeper-only ordered instructions
+- owner-scoped drafts; licensed publication; privacy-safe discovery; bounded
+  reporting; server-allowlisted moderation remove/restore
+- server-resolved room selections, recipe-only inventory, dependency-driven
+  legal actions/progress, exactly-three-player roles, and a 16-object cap
+- four cumulative Prisma migrations passed on fresh and simulated existing
+  Phase 5 databases; the live three-migration database upgraded incrementally
+  with only `20260724114500_fail_closed_test_snapshots`
+- 274/274 tests passed; all five workspace typechecks and ordered production
+  build passed; `git diff --check` passed
+- 9/9 production Playwright cases passed across Chromium, Firefox, WebKit,
+  emulated mobile Chrome, and emulated mobile Safari
+- clean production-like restart at `http://127.0.0.1:4173`; server listening on
+  port 2567; browser console and JavaScript error lists were empty
+- production-only audit reports three high advisories through Prisma's
+  development-tooling dependency on `find-my-way`; no reachable game-server
+  runtime path was established, and the offered fix is a forced breaking Prisma
+  downgrade
+- no human moderation, physical iOS/Android, LAN/audio, or real three-person
+  result is claimed
+
+## Phase 7 automated implementation — 2026-07-23
+
+- role-first, phase-aware Operate surface with setup hidden after connection
+  and secondary room metadata below objectives, HUD, actions, and signals
+- private Recipe Keeper rows expose repeated action quantity (`× 2`) so the
+  finite recipe list reconciles with the authoritative 10-step progress HUD
+- neutral Deaf Kitchen Guide briefing copy with the existing voice policy,
+  server authority, stable selectors, and Recipe Keeper privacy unchanged
+- browser-local, strict structured feedback with a 30-record cap,
+  deterministic JSON export, key-scoped clear, and no feedback network path
+- accessible terminal debrief with pause-excluded monotonic observed duration
+  and one submission per observed terminal round in a page lifecycle
+- account controls remain hidden during active play but return below the
+  terminal debrief, preserving history and sign-out without reopening setup
+- existing full Chromium round and existing mobile Chrome/WebKit scenarios
+  extended without expanding the Phase 6 browser matrix
+- automated verification: 167 client tests and 256 root tests passed; all five
+  workspace typechecks/builds passed; the rebuilt 9-case Playwright matrix
+  passed across Chromium, Firefox, WebKit, emulated mobile Chrome, and emulated
+  mobile Safari, with no leaked temporary database directories
+- both full and production-only dependency audits report zero vulnerabilities;
+  `git diff --check`, Phase 7 secret/debug scans, and live browser console checks
+  pass
+- fresh detached production restart at `http://127.0.0.1:4173`: client HTTP 200,
+  unauthenticated account API 401 as designed, real room created at 1 / 3 with
+  the role-first Operate surface, and zero browser console/page errors
+- automated tests do not claim fun, participation quality, frustration,
+  physical communication quality, or replay intent; several real
+  three-person role-rotated sessions remain required
+
+## Phase 6 implementation — 2026-07-23
+
+- accessible touch-portrait gate with landscape recovery, optional
+  user-initiated fullscreen/orientation lock, fallback guidance, and teardown
+- touch/pen/mouse/keyboard annotation without user-agent parsing, blanket
+  default prevention, or zoom suppression
+- safe-area/dynamic-viewport layout, 44px targets, visible focus, reduced
+  motion, and robust editable-canvas pointer cancellation
+- Chromium-only full regression, narrow Firefox/WebKit smoke, and narrow
+  emulated Chrome/Safari mobile touch/layout projects
+- `npm.cmd test`: 209 tests passed (structure 2, client 120, server 61,
+  recipe schema 9, shared 17); all five workspace type checks/builds passed
+- portrait modal focus enters the gate and restores the prior in-app control
+  after landscape recovery
+- client tests, typecheck, build, and the 9-case Playwright matrix verified on
+  Chromium, Firefox, WebKit, emulated Pixel Chrome, and emulated iPhone WebKit
+- CI now has separate `validate` and scoped multi-browser `e2e` jobs; the YAML
+  parses locally, while the remote Actions run remains pending commit/push
+- no physical iOS or Android testing is claimed. Touch, safe areas, fullscreen,
+  reconnect, microphone/speaker, and a three-device LAN round remain blocking
+  manual checks in `docs/browser-support.md`
 
 ## Phase 5 delivered
 
@@ -71,7 +149,22 @@ Phase 5 — Accounts and persistence: implemented, independently reviewed, and v
 
 ## Next planned slice
 
-Phase 6 — Mobile and browser support: responsive landscape and touch support across the roadmap browser matrix.
+Phase 7 human gate — run several real three-person, role-rotated sessions using
+`docs/playtesting.md`; record structured evidence, make only evidence-backed
+UI/balance changes, and retest every accepted change.
+
+## Phase 8 delivered
+
+- bounded strict custom recipe schema with structured diagnostics
+- migrated lifecycle/license/report/test-token persistence and generated Prisma client
+- owner, discovery, report, and allowlisted moderation HTTP surfaces
+- one immutable server-resolved recipe across provisioning, progress, timer,
+  Recipe Keeper privacy, outcome, and history
+- accessible structured Recipe Studio, lifecycle controls, discovery/report UI,
+  and public/private room-selection handoff
+
+Pending human gates: a real moderator drill and a real exactly-three-person
+custom-recipe playtest. No human result is claimed.
 
 ## Earlier phase evidence
 

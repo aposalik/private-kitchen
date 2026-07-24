@@ -92,6 +92,7 @@ describe("PrismaRepository", () => {
       roundId: "restart-room:round-1",
       roomId: "restart-room",
       recipeId: "tomato-soup",
+      recipeSnapshotJson: JSON.stringify(TOMATO_SOUP_RECIPE),
       outcome: "WON",
       outcomeReason: "COMPLETED",
       completedStepCount: 10,
@@ -140,6 +141,7 @@ describe("PrismaRepository", () => {
       roundId: "room-1:round-1",
       roomId: "room-1",
       recipeId: "tomato-soup",
+      recipeSnapshotJson: JSON.stringify(TOMATO_SOUP_RECIPE),
       outcome: "WON" as const,
       outcomeReason: "COMPLETED",
       completedStepCount: 10,
@@ -163,6 +165,94 @@ describe("PrismaRepository", () => {
     expect(await repository.updateOwnedRecipe(stranger.id, created.id, TOMATO_SOUP_RECIPE)).toBeNull();
     expect(await repository.deleteOwnedRecipe(stranger.id, created.id)).toBe(false);
     expect(await repository.listOwnedRecipes(owner.id)).toHaveLength(1);
+  });
+
+  it("enforces recipe lifecycle, public filtering, reports, and hashed single-use test tokens", async () => {
+    const owner = await createAccount(repository, "publisher");
+    const reporter = await createAccount(repository, "reporter");
+    const draft = await repository.createOwnedRecipe(owner.id, {
+      ...TOMATO_SOUP_RECIPE,
+      id: "summer-soup",
+      title: "Summer Soup",
+    });
+
+    expect(draft).toMatchObject({ status: "DRAFT", license: null, publicationVersion: 0 });
+    expect(await repository.listPublishedRecipes({ query: "summer" })).toEqual([]);
+
+    const published = await repository.publishOwnedRecipe(owner.id, draft.id, "CC_BY_4_0", new Date("2026-07-24T10:00:00Z"));
+    expect(published).toMatchObject({ status: "PUBLISHED", license: "CC_BY_4_0", publicationVersion: 1 });
+    expect(await repository.listPublishedRecipes({ query: "summer" })).toEqual([
+      expect.objectContaining({ id: draft.id, title: "Summer Soup" }),
+    ]);
+
+    await expect(repository.createRecipeReport({
+      recipeId: draft.id,
+      reporterAccountId: reporter.id,
+      reason: "OTHER",
+      details: "Please review this recipe.",
+    })).resolves.toMatchObject({ status: "OPEN" });
+    await expect(repository.createRecipeReport({
+      recipeId: draft.id,
+      reporterAccountId: reporter.id,
+      reason: "OTHER",
+      details: "Duplicate.",
+    })).resolves.toBeNull();
+
+    const issued = await repository.createPrivateTestToken(owner.id, draft.id, new Date("2026-07-24T10:05:00Z"));
+    const storedTokens = await database.recipeTestToken.findMany();
+    expect(storedTokens).toHaveLength(1);
+    expect(storedTokens[0]?.tokenHash).not.toBe(issued.token);
+    expect(await repository.consumePrivateTestToken(issued.token, new Date("2026-07-24T10:04:00Z")))
+      .toMatchObject({ recipeId: draft.id, ownerAccountId: owner.id });
+    expect(await repository.consumePrivateTestToken(issued.token, new Date("2026-07-24T10:04:01Z"))).toBeNull();
+
+    await repository.removePublishedRecipe(draft.id, "Policy violation", new Date("2026-07-24T10:06:00Z"));
+    expect(await repository.findPublishedRecipe(draft.id)).toBeNull();
+  });
+
+  it("pins publication and private-test documents as immutable snapshots", async () => {
+    const owner = await createAccount(repository, "snapshot-owner");
+    const original = {
+      ...TOMATO_SOUP_RECIPE,
+      id: "snapshot-soup",
+      title: "Snapshot Soup",
+    };
+    const changed = { ...original, title: "Changed Soup" };
+    const publishedDraft = await repository.createOwnedRecipe(owner.id, original);
+    await repository.publishOwnedRecipe(
+      owner.id,
+      publishedDraft.id,
+      "CC0_1_0",
+      new Date("2026-07-24T11:00:00Z"),
+    );
+    await database.ownedRecipe.update({
+      where: { id: publishedDraft.id },
+      data: { title: changed.title, documentJson: JSON.stringify(changed) },
+    });
+    expect(await repository.findPublishedRecipe(publishedDraft.id)).toMatchObject({
+      title: "Snapshot Soup",
+      document: original,
+    });
+
+    const privateDraft = await repository.createOwnedRecipe(owner.id, {
+      ...original,
+      id: "private-snapshot-soup",
+      title: "Private Snapshot Soup",
+    });
+    const issued = await repository.createPrivateTestToken(
+      owner.id,
+      privateDraft.id,
+      new Date("2026-07-24T11:05:00Z"),
+    );
+    await repository.updateOwnedRecipe(owner.id, privateDraft.id, {
+      ...original,
+      id: "private-snapshot-soup",
+      title: "Edited After Token",
+    });
+    expect((await repository.consumePrivateTestToken(
+      issued!.token,
+      new Date("2026-07-24T11:04:00Z"),
+    ))?.document.title).toBe("Private Snapshot Soup");
   });
 
   it("does not bootstrap persistent databases outside the Prisma migration ledger", async () => {

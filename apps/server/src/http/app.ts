@@ -1,7 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 
-import { validateRecipe } from "@cooking-game/recipe-schema";
+import { diagnoseRecipe, validateRecipe } from "@cooking-game/recipe-schema";
 import { AttemptRateLimiter } from "../auth/rate-limit.js";
 import { AuthService, AuthenticationError, UsernameTakenError } from "../auth/service.js";
 import {
@@ -21,6 +21,13 @@ const preferencesSchema = z.strictObject({
 });
 const recipeBodySchema = z.strictObject({ document: z.unknown() });
 const recipeIdSchema = z.string().min(1).max(64).regex(/^[a-z0-9]+$/);
+const recipeLicenseSchema = z.strictObject({ license: z.enum(["CC0_1_0", "CC_BY_4_0"]) });
+const reportSchema = z.strictObject({
+  reason: z.enum(["HATE_OR_HARASSMENT", "SEXUAL_CONTENT", "VIOLENCE", "SPAM", "COPYRIGHT", "OTHER"]),
+  details: z.string().trim().min(10).max(500),
+});
+const moderationReasonSchema = z.strictObject({ reason: z.string().trim().min(3).max(500) });
+const emptyBodySchema = z.strictObject({});
 
 export interface KitchenHttpAppOptions {
   repository: PrismaRepository;
@@ -30,6 +37,11 @@ export interface KitchenHttpAppOptions {
   nodeEnv?: string;
   scrypt?: ScryptParameters;
   authRateLimit?: { attempts: number; windowMs: number };
+  moderatorUsernames?: readonly string[];
+  recipeRateLimits?: Partial<Record<"mutation" | "publish" | "testSession" | "report" | "discovery", {
+    attempts: number;
+    windowMs: number;
+  }>>;
 }
 
 export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
@@ -43,6 +55,22 @@ export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
   const auth = new AuthService(options.repository, options.scrypt ?? PRODUCTION_SCRYPT_PARAMETERS);
   const rateLimit = options.authRateLimit ?? { attempts: 8, windowMs: 10 * 60_000 };
   const limiter = new AttemptRateLimiter(rateLimit.attempts, rateLimit.windowMs, now);
+  const recipeLimiters = Object.fromEntries(
+    Object.entries({
+      mutation: { attempts: 60, windowMs: 60_000 },
+      publish: { attempts: 10, windowMs: 60_000 },
+      testSession: { attempts: 10, windowMs: 60_000 },
+      report: { attempts: 5, windowMs: 60_000 },
+      discovery: { attempts: 120, windowMs: 60_000 },
+      ...options.recipeRateLimits,
+    }).map(([name, config]) => [
+      name,
+      new AttemptRateLimiter(config.attempts, config.windowMs, now),
+    ]),
+  ) as Record<"mutation" | "publish" | "testSession" | "report" | "discovery", AttemptRateLimiter>;
+  const moderatorUsernames = new Set(
+    options.moderatorUsernames ?? configuredModeratorUsernames(),
+  );
   const explicitOrigins = new Set(options.allowedOrigins ?? configuredOrigins());
 
   app.disable("x-powered-by");
@@ -140,6 +168,9 @@ export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
   }));
 
   app.post("/api/account/recipes", authenticate(sessions), asyncHandler(async (request, response) => {
+    if (!consumeRecipeAttempt(recipeLimiters.mutation, request, response.locals.account.id, "recipe-mutation")) {
+      return sendRateLimit(response);
+    }
     const document = parseRecipeBody(request.body);
     if (!document) return sendError(response, 400, "INVALID_REQUEST", "Invalid recipe document.");
     const recipe = await options.repository.createOwnedRecipe(response.locals.account.id, document);
@@ -159,6 +190,13 @@ export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
     const document = parseRecipeBody(request.body);
     if (!id) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
     if (!document) return sendError(response, 400, "INVALID_REQUEST", "Invalid recipe document.");
+    if (!consumeRecipeAttempt(recipeLimiters.mutation, request, response.locals.account.id, "recipe-mutation")) {
+      return sendRateLimit(response);
+    }
+    const existing = await options.repository.findOwnedRecipe(response.locals.account.id, id);
+    if (existing && existing.status !== "DRAFT") {
+      return sendError(response, 409, "RECIPE_NOT_EDITABLE", "Unpublish the recipe before editing.");
+    }
     const recipe = await options.repository.updateOwnedRecipe(response.locals.account.id, id, document);
     if (!recipe) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
     response.json({ recipe });
@@ -167,6 +205,128 @@ export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
   app.delete("/api/account/recipes/:id", authenticate(sessions), asyncHandler(async (request, response) => {
     const id = parseRecipeId(firstParameter(request.params.id));
     if (!id || !await options.repository.deleteOwnedRecipe(response.locals.account.id, id)) {
+      return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    }
+    response.status(204).end();
+  }));
+
+  app.post("/api/account/recipes/:id/validate", authenticate(sessions), asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    if (!id || !emptyBodySchema.safeParse(request.body).success) {
+      return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    }
+    const recipe = await options.repository.findOwnedRecipe(response.locals.account.id, id);
+    if (!recipe) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    response.json({ diagnostics: diagnoseRecipe(recipe.document) });
+  }));
+
+  app.post("/api/account/recipes/:id/publish", authenticate(sessions), asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    const body = recipeLicenseSchema.safeParse(request.body);
+    if (!id) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    if (!body.success) return sendError(response, 400, "LICENSE_REQUIRED", "Choose a supported license.");
+    if (!consumeRecipeAttempt(recipeLimiters.publish, request, response.locals.account.id, "recipe-publish")) {
+      return sendRateLimit(response);
+    }
+    const recipe = await options.repository.findOwnedRecipe(response.locals.account.id, id);
+    if (!recipe) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    if (!diagnoseRecipe(recipe.document).valid) {
+      return sendError(response, 409, "RECIPE_INVALID", "Recipe must validate before publication.");
+    }
+    const published = await options.repository.publishOwnedRecipe(
+      response.locals.account.id,
+      id,
+      body.data.license,
+      now(),
+    );
+    if (!published) return sendError(response, 409, "INVALID_LIFECYCLE", "Recipe cannot be published.");
+    response.json({ recipe: published });
+  }));
+
+  app.post("/api/account/recipes/:id/unpublish", authenticate(sessions), asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    if (!id || !emptyBodySchema.safeParse(request.body).success) {
+      return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    }
+    const recipe = await options.repository.unpublishOwnedRecipe(response.locals.account.id, id);
+    if (!recipe) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    response.json({ recipe });
+  }));
+
+  app.post("/api/account/recipes/:id/test-sessions", authenticate(sessions), asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    if (!id || !emptyBodySchema.safeParse(request.body).success) {
+      return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    }
+    if (!consumeRecipeAttempt(recipeLimiters.testSession, request, response.locals.account.id, "recipe-test")) {
+      return sendRateLimit(response);
+    }
+    const expiresAt = new Date(now().getTime() + 5 * 60_000);
+    const issued = await options.repository.createPrivateTestToken(response.locals.account.id, id, expiresAt);
+    if (!issued) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    response.status(201).json({ recipeTestToken: issued.token, expiresAt: issued.expiresAt.toISOString() });
+  }));
+
+  app.get("/api/recipes", asyncHandler(async (request, response) => {
+    if (!consumeRecipeAttempt(recipeLimiters.discovery, request, request.ip || "unknown", "recipe-discovery")) {
+      return sendRateLimit(response);
+    }
+    const query = typeof request.query.query === "string" ? request.query.query.trim().slice(0, 80) : "";
+    const cursor = typeof request.query.cursor === "string" && recipeIdSchema.safeParse(request.query.cursor).success
+      ? request.query.cursor
+      : undefined;
+    const recipes = await options.repository.listPublishedRecipes({
+      ...(query ? { query } : {}),
+      ...(cursor ? { cursor } : {}),
+    });
+    response.json({ recipes, nextCursor: recipes.length === 20 ? recipes.at(-1)?.id ?? null : null });
+  }));
+
+  app.get("/api/recipes/:id", asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    if (!id) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    const recipe = await options.repository.findPublishedRecipe(id);
+    if (!recipe) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    const { document: _document, ...metadata } = recipe;
+    response.json({ recipe: metadata });
+  }));
+
+  app.post("/api/recipes/:id/reports", authenticate(sessions), asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    const body = reportSchema.safeParse(request.body);
+    if (!id) return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    if (!body.success) return sendError(response, 400, "INVALID_REQUEST", "Invalid report.");
+    if (!consumeRecipeAttempt(recipeLimiters.report, request, response.locals.account.id, "recipe-report")) {
+      return sendRateLimit(response);
+    }
+    if (!await options.repository.findPublishedRecipe(id)) {
+      return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    }
+    const report = await options.repository.createRecipeReport({
+      recipeId: id,
+      reporterAccountId: response.locals.account.id,
+      ...body.data,
+    });
+    if (!report) return sendError(response, 409, "ALREADY_REPORTED", "Recipe was already reported.");
+    response.status(201).json({ report: { id: report.id, status: report.status, createdAt: report.createdAt } });
+  }));
+
+  app.get("/api/moderation/recipe-reports", authenticate(sessions), requireModerator(moderatorUsernames), asyncHandler(async (_request, response) => {
+    response.json({ reports: await options.repository.listOpenRecipeReports() });
+  }));
+
+  app.post("/api/moderation/recipes/:id/remove", authenticate(sessions), requireModerator(moderatorUsernames), asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    const body = moderationReasonSchema.safeParse(request.body);
+    if (!id || !body.success || !await options.repository.removePublishedRecipe(id, body.data.reason, now())) {
+      return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
+    }
+    response.status(204).end();
+  }));
+
+  app.post("/api/moderation/recipes/:id/restore", authenticate(sessions), requireModerator(moderatorUsernames), asyncHandler(async (request, response) => {
+    const id = parseRecipeId(firstParameter(request.params.id));
+    if (!id || !emptyBodySchema.safeParse(request.body).success || !await options.repository.restoreRemovedRecipe(id)) {
       return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
     }
     response.status(204).end();
@@ -200,6 +360,16 @@ function authenticate(sessions: SessionService) {
   });
 }
 
+function requireModerator(moderatorUsernames: ReadonlySet<string>) {
+  return (_request: Request, response: Response, next: NextFunction) => {
+    if (!moderatorUsernames.has(response.locals.account.normalizedUsername)) {
+      sendError(response, 403, "MODERATOR_REQUIRED", "Moderator access required.");
+      return;
+    }
+    next();
+  };
+}
+
 function asyncHandler(
   handler: (request: Request, response: Response, next: NextFunction) => unknown | Promise<unknown>,
 ) {
@@ -216,6 +386,16 @@ function consumeAuthAttempt(
 ): boolean {
   const ip = request.ip || request.socket.remoteAddress || "unknown";
   return limiter.consume([`${namespace}:ip:${ip}`, `${namespace}:username:${normalizedUsername}`]);
+}
+
+function consumeRecipeAttempt(
+  limiter: AttemptRateLimiter,
+  request: Request,
+  identity: string,
+  namespace: string,
+): boolean {
+  const ip = request.ip || request.socket.remoteAddress || "unknown";
+  return limiter.consume([`${namespace}:ip:${ip}`, `${namespace}:identity:${identity}`]);
 }
 
 function parseRecipeBody(body: unknown) {
@@ -243,6 +423,18 @@ function configuredOrigins(): string[] {
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+}
+
+function configuredModeratorUsernames(): string[] {
+  return (process.env.MODERATOR_USERNAMES ?? "")
+    .split(",")
+    .map((username) => normalizeUsername(username))
+    .filter(Boolean);
+}
+
+function sendRateLimit(response: Response) {
+  response.setHeader("retry-after", "60");
+  return sendError(response, 429, "RATE_LIMITED", "Too many requests. Try again later.");
 }
 
 function sendError(response: Response, status: number, code: string, message: string) {

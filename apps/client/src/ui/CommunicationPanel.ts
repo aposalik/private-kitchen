@@ -149,7 +149,10 @@ export class CommunicationPanel {
     streamCount.dataset.voiceStreamCount = "";
     streamCount.setAttribute("aria-live", "polite");
     streamCount.textContent = `Remote streams: ${this.voice.remoteStreamCount}`;
-    section.append(policy, status, streamCount, this.voiceButton(this.voice.status));
+    section.append(policy, status, streamCount);
+    if (grant.canPublish || grant.canReceive) {
+      section.append(this.voiceButton(this.voice.status));
+    }
     return section;
   }
 

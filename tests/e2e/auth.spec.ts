@@ -1,7 +1,7 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { TOMATO_SOUP_RECIPE } from "@cooking-game/recipe-schema";
 
 test("account persists, owns data and history, signs out, while guests still join", async ({ browser, page }) => {
+  test.setTimeout(120_000);
   const username = `cook-${Date.now()}`;
   await page.goto("/");
   await page.locator("[name=username]").fill(username);
@@ -33,13 +33,18 @@ test("account persists, owns data and history, signs out, while guests still joi
     return (await response.json()).preferences.masterVolume;
   })).toBe(35);
 
-  await page.locator("[name=recipeDocument]").fill(JSON.stringify(TOMATO_SOUP_RECIPE));
-  await page.locator('[data-auth-action="create-recipe"]').click();
+  await page.locator("[name=recipeSlug]").fill("tomato-soup");
+  await page.locator("[name=recipeTitle]").fill("Tomato Soup");
+  await page.locator("[name=ingredient-tomato]").fill("2");
+  await page.locator("[name=ingredient-onion]").fill("1");
+  await page.locator('[data-studio-action="save"]').click();
   await expect(page.locator("[data-owned-recipes]")).toContainText("Tomato Soup");
   const recipeId = await page.evaluate(async () => {
     const response = await fetch("/api/account/recipes", { credentials: "include" });
     return (await response.json()).recipes[0].id as string;
   });
+  await page.locator(`[data-private-test-recipe="${recipeId}"]`).click();
+  await expect(page.locator("[data-selected-recipe]")).toContainText("private test");
 
   await page.locator('[data-action="create"]').click();
   await expect(page.locator('[data-field="room"]')).not.toHaveText("—");
@@ -77,6 +82,7 @@ test("account persists, owns data and history, signs out, while guests still joi
     await page.locator('[data-auth-action="logout"]').click();
     await expect(page.locator("[data-auth-form]")).toBeVisible();
     await page.reload();
+    await expect(page.locator("[data-round-result]")).toBeVisible({ timeout: 30_000 });
     await expect(page.locator("[data-auth-form]")).toBeVisible();
     const freshGuest = await browser.newContext();
     guestContexts.push(freshGuest);
@@ -104,19 +110,24 @@ async function completeRecipe(blind: Page, players: Page[]): Promise<void> {
     await expect(candidate).toBeVisible();
     const id = (await candidate.getAttribute("data-object-id"))!;
     ids.push(id);
+    await candidate.locator("[data-point-object]").click();
     await candidate.locator("[data-pick-up]").click();
     const row = blind.locator(`[data-object-id="${id}"]`);
     await expect(row).toContainText("Held by you");
+    await row.locator("[data-point-object]").click();
     await row.locator('[data-cook-action="CHOP"]').click();
     await expect(row).toContainText("Chopped · Counter · Held by you");
     await expectProgress(players, ++progress);
+    await row.locator("[data-point-object]").click();
     await row.locator("[data-drop]").click();
     await expect(row).toContainText("Chopped · Counter · Available");
   }
   for (const id of ids) {
     const row = blind.locator(`[data-object-id="${id}"]`);
+    await row.locator("[data-point-object]").click();
     await row.locator("[data-pick-up]").click();
     await expect(row).toContainText("Chopped · Counter · Held by you");
+    await row.locator("[data-point-object]").click();
     await row.locator('[data-cook-action="ADD_TO_POT"]').click();
     await expect(row).toContainText("Chopped · Pot · Available");
     await expectProgress(players, ++progress);

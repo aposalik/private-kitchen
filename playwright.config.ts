@@ -13,13 +13,39 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
   },
-  projects: [{
-    name: "chromium",
-    use: {
-      ...devices["Desktop Chrome"],
-      launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+  projects: [
+    {
+      name: "chromium",
+      testIgnore: /mobile-layout\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+      },
     },
-  }],
+    {
+      name: "firefox",
+      testMatch: /browser-support\.spec\.ts/,
+      use: { ...devices["Desktop Firefox"] },
+    },
+    {
+      name: "webkit",
+      testMatch: /browser-support\.spec\.ts/,
+      use: { ...devices["Desktop Safari"] },
+    },
+    {
+      name: "mobile-chrome",
+      testMatch: /mobile-layout\.spec\.ts/,
+      use: {
+        ...devices["Pixel 7"],
+        launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+      },
+    },
+    {
+      name: "mobile-safari",
+      testMatch: /mobile-layout\.spec\.ts/,
+      use: { ...devices["iPhone 15"] },
+    },
+  ],
   webServer: [
     {
       command: "npm run start --workspace @cooking-game/server",

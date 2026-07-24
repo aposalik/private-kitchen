@@ -61,3 +61,13 @@ export type GameHistory = Prisma.GameHistoryModel
  * 
  */
 export type OwnedRecipe = Prisma.OwnedRecipeModel
+/**
+ * Model RecipeReport
+ * 
+ */
+export type RecipeReport = Prisma.RecipeReportModel
+/**
+ * Model RecipeTestToken
+ * 
+ */
+export type RecipeTestToken = Prisma.RecipeTestTokenModel

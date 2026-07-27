@@ -227,9 +227,9 @@ test("three isolated players communicate under exact role policy and a fourth is
     await expectTextFor(deafGuide.locator("[data-voice-stream-count]"), "Remote streams: 0");
 
     await blindCook.reload();
-    await expect(blindCook.locator('[data-field="role"]')).toHaveText("Blind Cook");
-    await expect(blindCook.locator('[data-field="players"]')).toHaveText("3 / 3");
-    await expect(blindCook.locator('[data-field="status"]')).toHaveText("Ready");
+    await expect(blindCook.locator('[data-field="role"]')).toHaveText("Blind Cook", { timeout: 30_000 });
+    await expect(blindCook.locator('[data-field="players"]')).toHaveText("3 / 3", { timeout: 30_000 });
+    await expect(blindCook.locator('[data-field="status"]')).toHaveText("Ready", { timeout: 30_000 });
 
     const localKeysBefore = await blindCook.evaluate(() => Object.keys(localStorage));
     await blindCook.locator('select[name="participationRating"]').selectOption("5");

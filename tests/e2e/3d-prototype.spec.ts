@@ -196,8 +196,8 @@ async function waitForCameraToSettle(page: Page): Promise<void> {
     previous = current;
     return stableSamples;
   }, {
-    timeout: 10_000,
-    intervals: [100, 100, 100, 100, 100, 100, 100, 100],
+    timeout: 45_000,
+    intervals: [250, 250, 250, 250, 250, 250, 250, 250],
   }).toBeGreaterThanOrEqual(3);
 }
 

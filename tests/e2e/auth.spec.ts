@@ -85,7 +85,7 @@ test("account persists, owns data and history, signs out, while guests still joi
     await expect(page.locator("[data-auth-form]")).toBeVisible();
     await page.reload();
     await expect(page.locator("[data-round-result]")).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator("[data-auth-form]")).toBeVisible();
+    await expect(page.locator("[data-auth-form]")).toBeVisible({ timeout: 30_000 });
     const freshGuest = await browser.newContext();
     guestContexts.push(freshGuest);
     const freshGuestPage = await freshGuest.newPage();

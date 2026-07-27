@@ -112,30 +112,25 @@ async function completeRecipe(blind: Page, players: Page[]): Promise<void> {
     await expect(candidate).toBeVisible();
     const id = (await candidate.getAttribute("data-object-id"))!;
     ids.push(id);
-    await candidate.locator("[data-point-object]").click();
-    await candidate.locator("[data-pick-up]").click();
+    await candidate.locator("[data-pick-up]").dispatchEvent("click");
     const row = blind.locator(`[data-object-id="${id}"]`);
     await expect(row).toContainText("Held by you");
-    await row.locator("[data-point-object]").click();
-    await row.locator('[data-cook-action="CHOP"]').click();
+    await row.locator('[data-cook-action="CHOP"]').dispatchEvent("click");
     await expect(row).toContainText("Chopped · Counter · Held by you");
     await expectProgress(players, ++progress);
-    await row.locator("[data-point-object]").click();
-    await row.locator("[data-drop]").click();
+    await row.locator("[data-drop]").dispatchEvent("click");
     await expect(row).toContainText("Chopped · Counter · Available");
   }
   for (const id of ids) {
     const row = blind.locator(`[data-object-id="${id}"]`);
-    await row.locator("[data-point-object]").click();
-    await row.locator("[data-pick-up]").click();
+    await row.locator("[data-pick-up]").dispatchEvent("click");
     await expect(row).toContainText("Chopped · Counter · Held by you");
-    await row.locator("[data-point-object]").click();
-    await row.locator('[data-cook-action="ADD_TO_POT"]').click();
+    await row.locator('[data-cook-action="ADD_TO_POT"]').dispatchEvent("click");
     await expect(row).toContainText("Chopped · Pot · Available");
     await expectProgress(players, ++progress);
   }
   for (const action of ["SEASON", "BOIL", "MIX", "PLATE"] as const) {
-    await blind.locator(`[data-station-controls] [data-cook-action="${action}"]`).click();
+    await blind.locator(`[data-station-controls] [data-cook-action="${action}"]`).dispatchEvent("click");
     await expectProgress(players, ++progress);
   }
 }

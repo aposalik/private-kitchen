@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { PlayerRole } from "./roles.js";
 import type { KitchenObjectCollection } from "./game-state.js";
+import type { PlayerTransform } from "./movement.js";
 
 export const ROOM_STATUSES = ["WAITING", "READY"] as const;
 export type RoomStatus = (typeof ROOM_STATUSES)[number];
@@ -32,7 +33,7 @@ export const publicRoundStateSchema = z.strictObject({
 
 export type PublicRoundState = z.infer<typeof publicRoundStateSchema>;
 
-export interface KitchenPlayerState {
+export interface KitchenPlayerState extends PlayerTransform {
   readonly id: string;
   readonly displayName: string;
   readonly role: PlayerRole;

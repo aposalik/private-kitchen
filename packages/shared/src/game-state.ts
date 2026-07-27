@@ -1,9 +1,11 @@
-export const KITCHEN_BOUNDS = {
-  minX: 0,
-  maxX: 100,
-  minY: 0,
-  maxY: 60,
-} as const;
+import { KITCHEN_LAYOUT } from "./kitchen-layout.js";
+
+export const KITCHEN_BOUNDS = Object.freeze({
+  minX: KITCHEN_LAYOUT.worldBounds.minX,
+  maxX: KITCHEN_LAYOUT.worldBounds.maxX,
+  minY: KITCHEN_LAYOUT.worldBounds.minZ,
+  maxY: KITCHEN_LAYOUT.worldBounds.maxZ,
+});
 
 export const BLIND_COOK_INTERACTION = {
   originX: 50,

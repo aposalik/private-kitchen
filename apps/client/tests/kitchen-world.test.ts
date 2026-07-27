@@ -18,9 +18,14 @@ describe("KitchenWorld adapter lifecycle", () => {
       update: vi.fn(),
       destroy: vi.fn(),
     };
+    const input = {
+      mount: vi.fn(),
+      destroy: vi.fn(),
+    };
     const lobby = new Lobby(root, connection, {
       storage: memoryStorage(),
       world,
+      input: input as never,
     });
 
     lobby.mount();
@@ -52,6 +57,7 @@ describe("KitchenWorld adapter lifecycle", () => {
     expect(world.mount).toHaveBeenCalledTimes(1);
     expect(world.mount).toHaveBeenCalledWith(stage);
     expect(world.update).toHaveBeenLastCalledWith(running);
+    expect(input.mount).toHaveBeenCalledTimes(1);
     const hotspot = root.querySelector('[data-point-object="tomato-1"]');
 
     const timerOnly = {
@@ -66,6 +72,133 @@ describe("KitchenWorld adapter lifecycle", () => {
 
     lobby.destroy();
     expect(world.destroy).toHaveBeenCalledTimes(1);
+    expect(input.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  test("releases the mounted gameplay input lifecycle on disconnect", () => {
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    const connection = new FakeConnection();
+    const input = { mount: vi.fn(), destroy: vi.fn() };
+    const lobby = new Lobby(root, connection, {
+      storage: memoryStorage(),
+      world: { mount: vi.fn(), update: vi.fn(), destroy: vi.fn() },
+      input: input as never,
+    });
+    lobby.mount();
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      sessionId: "self",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+    });
+    connection.emit({ connectionStatus: "DISCONNECTED" });
+
+    expect(input.mount).toHaveBeenCalledTimes(1);
+    expect(input.destroy).toHaveBeenCalledTimes(1);
+    lobby.destroy();
+    expect(input.destroy).toHaveBeenCalledTimes(2);
+  });
+
+  test("announces Babylon renderer failures through an accessible alert", () => {
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    const connection = new FakeConnection();
+    const world = { mount: vi.fn(), update: vi.fn(), destroy: vi.fn() };
+    const lobby = new Lobby(root, connection, {
+      storage: memoryStorage(),
+      world,
+    });
+    lobby.mount();
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      sessionId: "self",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+    });
+
+    root.querySelector<HTMLElement>("[data-kitchen-world]")!.dispatchEvent(
+      new CustomEvent("kitchenrenderererror", {
+        bubbles: true,
+        detail: {
+          renderer: "babylon",
+          category: "timeout",
+          reason: "Babylon scene did not render within 50 ms",
+        },
+      }),
+    );
+
+    const alert = root.querySelector<HTMLElement>("[data-renderer-error]")!;
+    expect(alert).not.toBeNull();
+    expect(alert.getAttribute("role")).toBe("alert");
+    expect(alert.hidden).toBe(false);
+    expect(alert.textContent).toContain("Babylon");
+    expect(alert.textContent).toContain("did not render within 50 ms");
+    lobby.destroy();
+  });
+
+  test("maps gameplay keyboard input to movement, context interaction, and local pause", () => {
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    const connection = new FakeConnection();
+    connection.move.mockReturnValue(11);
+    const world = {
+      mount: vi.fn(),
+      update: vi.fn(),
+      predictMovement: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const lobby = new Lobby(root, connection, {
+      storage: memoryStorage(),
+      world,
+    });
+    lobby.mount();
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      sessionId: "self",
+      role: "BLIND_COOK",
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+      players: [{
+        id: "self",
+        role: "BLIND_COOK",
+        connected: true,
+        x: 32,
+        z: 44,
+        facingYaw: 0,
+        locomotion: "IDLE",
+        lastProcessedMovementSequence: 0,
+      }],
+      objects: [{
+        id: "tomato",
+        kind: "TOMATO",
+        label: "Tomato",
+        x: 32,
+        y: 44,
+        preparation: "RAW",
+        location: "COUNTER",
+      }],
+    });
+    expect(root.dataset.renderer).toBe("babylon");
+    expect(root.querySelector("[data-renderer-marker]")!.textContent)
+      .toContain("Babylon 3D");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyW" }));
+    expect(connection.move).toHaveBeenLastCalledWith(0, -1);
+    expect(world.predictMovement).toHaveBeenLastCalledWith(0, -1, 11);
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyE" }));
+    expect(connection.pickUp).toHaveBeenCalledWith("tomato");
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "Escape" }));
+    expect(root.querySelector<HTMLElement>("[data-pause-overlay]")!.hidden).toBe(false);
+    expect(connection.move).toHaveBeenLastCalledWith(0, 0);
+
+    connection.emit({ connectionStatus: "DISCONNECTED" });
+    window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyD" }));
+    expect(connection.move).toHaveBeenLastCalledWith(0, 0);
+    lobby.destroy();
   });
 
   test("spatial hotspots expose only role-safe bounded existing commands", () => {
@@ -157,10 +290,7 @@ describe("KitchenWorld adapter lifecycle", () => {
       bubbles: true,
     }));
     root.querySelector<HTMLButtonElement>('[data-drop="held"]')!.click();
-    expect(connection.drop).toHaveBeenCalledOnce();
-    const [, x, y] = connection.drop.mock.calls[0]!;
-    expect(Number.isFinite(x) && x >= 0 && x <= 100).toBe(true);
-    expect(Number.isFinite(y) && y >= 0 && y <= 60).toBe(true);
+    expect(connection.drop).toHaveBeenCalledWith("held");
 
     connection.emit({ ...running, role: "RECIPE_KEEPER" });
     expect(root.querySelectorAll(
@@ -246,6 +376,7 @@ class FakeConnection implements LobbyConnection {
   create = vi.fn(async () => undefined);
   join = vi.fn(async () => undefined);
   resume = vi.fn(async () => false);
+  move = vi.fn();
   pickUp = vi.fn();
   drop = vi.fn();
   chop = vi.fn();

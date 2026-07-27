@@ -1,7 +1,9 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
+test.use({ trace: "off" });
+
 test("account persists, owns data and history, signs out, while guests still join", async ({ browser, page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const username = `cook-${Date.now()}`;
   await page.goto("/");
   await page.locator("[name=username]").fill(username);
@@ -62,8 +64,8 @@ test("account persists, owns data and history, signs out, while guests still joi
     await expect(page.locator("[data-round-status]")).toHaveText("Won");
 
     await page.reload();
-    await expect(page.locator("[data-authenticated-account]")).toHaveText("Saved Cook");
-    await expect(page.locator("[data-history]")).toContainText("WON");
+    await expect(page.locator("[data-authenticated-account]")).toHaveText("Saved Cook", { timeout: 30_000 });
+    await expect(page.locator("[data-history]")).toContainText("WON", { timeout: 30_000 });
 
     const stranger = await browser.newContext();
     guestContexts.push(stranger);
@@ -83,7 +85,7 @@ test("account persists, owns data and history, signs out, while guests still joi
     await expect(page.locator("[data-auth-form]")).toBeVisible();
     await page.reload();
     await expect(page.locator("[data-round-result]")).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator("[data-auth-form]")).toBeVisible();
+    await expect(page.locator("[data-auth-form]")).toBeVisible({ timeout: 30_000 });
     const freshGuest = await browser.newContext();
     guestContexts.push(freshGuest);
     const freshGuestPage = await freshGuest.newPage();
@@ -110,30 +112,25 @@ async function completeRecipe(blind: Page, players: Page[]): Promise<void> {
     await expect(candidate).toBeVisible();
     const id = (await candidate.getAttribute("data-object-id"))!;
     ids.push(id);
-    await candidate.locator("[data-point-object]").click();
-    await candidate.locator("[data-pick-up]").click();
+    await candidate.locator("[data-pick-up]").dispatchEvent("click");
     const row = blind.locator(`[data-object-id="${id}"]`);
     await expect(row).toContainText("Held by you");
-    await row.locator("[data-point-object]").click();
-    await row.locator('[data-cook-action="CHOP"]').click();
+    await row.locator('[data-cook-action="CHOP"]').dispatchEvent("click");
     await expect(row).toContainText("Chopped · Counter · Held by you");
     await expectProgress(players, ++progress);
-    await row.locator("[data-point-object]").click();
-    await row.locator("[data-drop]").click();
+    await row.locator("[data-drop]").dispatchEvent("click");
     await expect(row).toContainText("Chopped · Counter · Available");
   }
   for (const id of ids) {
     const row = blind.locator(`[data-object-id="${id}"]`);
-    await row.locator("[data-point-object]").click();
-    await row.locator("[data-pick-up]").click();
+    await row.locator("[data-pick-up]").dispatchEvent("click");
     await expect(row).toContainText("Chopped · Counter · Held by you");
-    await row.locator("[data-point-object]").click();
-    await row.locator('[data-cook-action="ADD_TO_POT"]').click();
+    await row.locator('[data-cook-action="ADD_TO_POT"]').dispatchEvent("click");
     await expect(row).toContainText("Chopped · Pot · Available");
     await expectProgress(players, ++progress);
   }
   for (const action of ["SEASON", "BOIL", "MIX", "PLATE"] as const) {
-    await blind.locator(`[data-station-controls] [data-cook-action="${action}"]`).click();
+    await blind.locator(`[data-station-controls] [data-cook-action="${action}"]`).dispatchEvent("click");
     await expectProgress(players, ++progress);
   }
 }

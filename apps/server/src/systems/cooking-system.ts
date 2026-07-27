@@ -11,6 +11,7 @@ import {
   createInitialKitchenObjects,
   type CookAction,
   type CookingErrorCode,
+  type KitchenStationId,
   type PlayerRole,
 } from "@cooking-game/shared";
 
@@ -21,6 +22,7 @@ export interface CookingSystemOptions {
   recipe: Recipe;
   createObject(): KitchenObject;
   onTerminal?(): void;
+  canReachStation(sessionId: string, stationId: KitchenStationId): boolean;
 }
 
 export class CookingSystem {
@@ -134,7 +136,7 @@ export class CookingSystem {
 
   private handleAction(client: Client, action: CookAction): CookingErrorCode | undefined {
     if (action.action !== "CHOP" && action.action !== "ADD_TO_POT") {
-      return this.handleTerminalAction(action.action);
+      return this.handleTerminalAction(client.sessionId, action.action);
     }
     const object = this.state.objects.get(action.objectId);
     if (!object) return "OBJECT_NOT_FOUND";
@@ -145,6 +147,8 @@ export class CookingSystem {
     if (!ingredient) return "OUT_OF_ORDER";
     if (object.heldBy !== client.sessionId) return "OBJECT_NOT_OWNED";
     if (object.location !== "COUNTER") return "INVALID_PREPARATION";
+    const station = action.action === "CHOP" ? "PREPARATION" : "STOVE";
+    if (!this.options.canReachStation(client.sessionId, station)) return "OUT_OF_REACH";
 
     const step = this.options.recipe.steps.find((candidate) =>
       candidate.action === action.action && candidate.ingredientId === ingredient.id
@@ -180,8 +184,11 @@ export class CookingSystem {
   }
 
   private handleTerminalAction(
+    sessionId: string,
     action: "SEASON" | "BOIL" | "MIX" | "PLATE",
   ): CookingErrorCode | undefined {
+    const station = action === "PLATE" ? "SERVING_PASS" : "STOVE";
+    if (!this.options.canReachStation(sessionId, station)) return "OUT_OF_REACH";
     const step = this.options.recipe.steps.find((candidate) => candidate.action === action);
     if (!step || !this.canAdvance(step)) return "OUT_OF_ORDER";
 

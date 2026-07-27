@@ -14,8 +14,9 @@ import {
   MAX_OBJECT_ID_LENGTH,
   createInitialKitchenObjects,
   DEFAULT_RECONNECTION_GRACE_SECONDS,
-  isInsideKitchenBounds,
-  isWithinReach,
+  isPointWithinRadius,
+  KITCHEN_LAYOUT,
+  OBJECT_INTERACTION_RADIUS,
   PLAYER_ROLES,
   REQUIRED_PLAYER_COUNT,
   type InteractionErrorCode,
@@ -31,6 +32,7 @@ import {
 import { CommunicationSystem } from "../systems/communication-system.js";
 import { CookingSystem } from "../systems/cooking-system.js";
 import { RecipeSystem } from "../systems/recipe-system.js";
+import { MovementSystem } from "../systems/movement-system.js";
 import type { NewGameHistory } from "../db/repository.js";
 
 const joinOptionsSchema = z
@@ -44,19 +46,18 @@ const joinOptionsSchema = z
 
 const objectIdSchema = z.string().trim().min(1).max(MAX_OBJECT_ID_LENGTH);
 const pickUpPayloadSchema = z.object({ objectId: objectIdSchema }).strict();
-const dropPayloadSchema = z
-  .object({
-    objectId: objectIdSchema,
-    x: z.number().finite(),
-    y: z.number().finite(),
-  })
-  .strict();
+const dropPayloadSchema = z.object({ objectId: objectIdSchema }).strict();
 
 class KitchenPlayer extends Schema {
   id = "";
   displayName = "";
   role: PlayerRole = "BLIND_COOK";
   connected = true;
+  x = 0;
+  z = 0;
+  facingYaw = 0;
+  locomotion: "IDLE" | "MOVE" = "IDLE";
+  lastProcessedMovementSequence = 0;
 }
 
 defineTypes(KitchenPlayer, {
@@ -64,6 +65,11 @@ defineTypes(KitchenPlayer, {
   displayName: "string",
   role: "string",
   connected: "boolean",
+  x: "float64",
+  z: "float64",
+  facingYaw: "float64",
+  locomotion: "string",
+  lastProcessedMovementSequence: "number",
 });
 
 export class KitchenObject extends Schema {
@@ -151,6 +157,7 @@ export class KitchenRoom extends Room {
   private communication!: CommunicationSystem;
   private cooking!: CookingSystem;
   private recipe!: RecipeSystem;
+  private movement!: MovementSystem;
   private now: () => Date = () => new Date();
   private resolveAuthCookie: KitchenRoomOptions["resolveAuthCookie"];
   private recordGameHistory: KitchenRoomOptions["recordGameHistory"];
@@ -210,11 +217,18 @@ export class KitchenRoom extends Room {
       recipe: this.resolvedRecipe,
       createObject: () => new KitchenObject(),
       onTerminal: () => this.recordTerminalHistory(),
+      canReachStation: (sessionId, stationId) => {
+        const player = this.state.players.get(sessionId);
+        const station = KITCHEN_LAYOUT.stations[stationId];
+        return Boolean(player && isPointWithinRadius(player, station, station.interactionRadius));
+      },
     });
     this.cooking.register(
       this,
       (sessionId) => this.state.players.get(sessionId)?.role,
     );
+    this.movement = new MovementSystem(this.state);
+    this.movement.register(this);
     this.recipe = new RecipeSystem(this, {
       roleOf: (sessionId) => this.state.players.get(sessionId)?.role,
       roundStarted: () => this.state.roundStatus !== "NOT_STARTED",
@@ -266,6 +280,9 @@ export class KitchenRoom extends Room {
     player.id = client.sessionId;
     player.displayName = options.displayName;
     player.role = role;
+    const spawn = KITCHEN_LAYOUT.roleSpawns[role];
+    player.x = spawn.x;
+    player.z = spawn.z;
     this.state.players.set(client.sessionId, player);
     const auth = client.auth as KitchenClientAuth | undefined;
     if (auth?.account && auth.account.expiresAt.getTime() > this.now().getTime()) {
@@ -286,6 +303,7 @@ export class KitchenRoom extends Room {
     const player = this.state.players.get(client.sessionId);
     if (player) {
       player.connected = false;
+      this.movement.disconnected(client.sessionId);
       this.communication.disconnected(client.sessionId, false);
       this.updateReadiness();
       this.cooking.readinessChanged(false);
@@ -311,6 +329,7 @@ export class KitchenRoom extends Room {
   onLeave(client: Client): void {
     this.communication.disconnected(client.sessionId, true);
     this.cooking.permanentLeave(client.sessionId);
+    this.movement.permanentLeave(client.sessionId);
     this.releaseHeldObjects(client.sessionId);
     this.state.players.delete(client.sessionId);
     this.accountBySession.delete(client.sessionId);
@@ -321,6 +340,7 @@ export class KitchenRoom extends Room {
   onDispose(): void {
     this.communication.dispose();
     this.cooking.dispose();
+    this.movement.dispose();
     this.accountBySession.clear();
     this.historyWrites.clear();
   }
@@ -386,11 +406,18 @@ export class KitchenRoom extends Room {
       this.sendInteractionError(client, "ALREADY_HOLDING", "You are already holding an object.");
       return;
     }
-    if (!isWithinReach(object.x, object.y)) {
+    const player = this.state.players.get(client.sessionId)!;
+    if (!isPointWithinRadius(
+      { x: player.x, z: player.z },
+      { x: object.x, z: object.y },
+      OBJECT_INTERACTION_RADIUS,
+    )) {
       this.sendInteractionError(client, "OUT_OF_REACH", "Object is out of reach.");
       return;
     }
     object.heldBy = client.sessionId;
+    object.x = player.x;
+    object.y = player.z;
   }
 
   private handleDrop(client: Client, rawPayload: unknown): void {
@@ -412,16 +439,9 @@ export class KitchenRoom extends Room {
       this.sendInteractionError(client, "NOT_HOLDER", "You do not hold that object.");
       return;
     }
-    if (!isInsideKitchenBounds(parsed.data.x, parsed.data.y)) {
-      this.sendInteractionError(client, "INVALID_DESTINATION", "Destination is outside the kitchen.");
-      return;
-    }
-    if (!isWithinReach(parsed.data.x, parsed.data.y)) {
-      this.sendInteractionError(client, "OUT_OF_REACH", "Destination is out of reach.");
-      return;
-    }
-    object.x = parsed.data.x;
-    object.y = parsed.data.y;
+    const player = this.state.players.get(client.sessionId)!;
+    object.x = player.x;
+    object.y = player.z;
     object.heldBy = "";
   }
 

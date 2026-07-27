@@ -201,7 +201,7 @@ describe("KitchenRoom capacity", () => {
       (state) => state.objects.get(object.id)?.heldBy === blindCook.sessionId,
     );
 
-    blindCook.send(KITCHEN_MESSAGES.drop, { objectId: object.id, x: 50, y: 30 });
+    blindCook.send(KITCHEN_MESSAGES.drop, { objectId: object.id });
     await waitForState(observer, (state) => {
       const current = state.objects.get(object.id);
       return current?.heldBy === "" && current.x === 50 && current.y === 30;
@@ -259,7 +259,7 @@ describe("KitchenRoom capacity", () => {
     expect(observerErrors).toEqual([]);
   });
 
-  test("out-of-reach drops are rejected without changing position or ownership", async () => {
+  test("client-coordinate drops are rejected without changing position or ownership", async () => {
     const ready = await createReadyRoom();
     const object = Array.from(ready.blindCook.state.objects.values())[0]!;
     ready.blindCook.send(KITCHEN_MESSAGES.pickUp, { objectId: object.id });
@@ -273,7 +273,7 @@ describe("KitchenRoom capacity", () => {
 
     ready.blindCook.send(KITCHEN_MESSAGES.drop, { objectId: object.id, x: 0, y: 0 });
 
-    await expect(error).resolves.toMatchObject({ code: "OUT_OF_REACH" });
+    await expect(error).resolves.toMatchObject({ code: "INVALID_COMMAND" });
     const after = ready.observer.state.objects.get(object.id)!;
     expect({ x: after.x, y: after.y, heldBy: after.heldBy }).toEqual({
       ...previous,
@@ -341,12 +341,13 @@ describe("KitchenRoom capacity", () => {
   test("grace expiry releases held objects at their last valid position", async () => {
     const ready = await createReadyRoom(0.15);
     const object = Array.from(ready.blindCook.state.objects.values())[0]!;
-    const position = { x: object.x, y: object.y };
     ready.blindCook.send(KITCHEN_MESSAGES.pickUp, { objectId: object.id });
     await waitForState(
       ready.observer,
       (state) => state.objects.get(object.id)?.heldBy === ready.blindCook.sessionId,
     );
+    const held = ready.observer.state.objects.get(object.id)!;
+    const position = { x: held.x, y: held.y };
     ready.blindCook.reconnection.enabled = false;
     ready.blindCook.connection.close();
 
@@ -364,12 +365,13 @@ describe("KitchenRoom capacity", () => {
   test("voluntary leave releases held objects before removing the player", async () => {
     const ready = await createReadyRoom();
     const object = Array.from(ready.blindCook.state.objects.values())[0]!;
-    const position = { x: object.x, y: object.y };
     ready.blindCook.send(KITCHEN_MESSAGES.pickUp, { objectId: object.id });
     await waitForState(
       ready.observer,
       (state) => state.objects.get(object.id)?.heldBy === ready.blindCook.sessionId,
     );
+    const held = ready.observer.state.objects.get(object.id)!;
+    const position = { x: held.x, y: held.y };
 
     await ready.blindCook.leave();
     await waitForState(

@@ -110,7 +110,7 @@ body {
   width: 100% !important;
   height: 100% !important;
 }
-.kitchen-world { z-index: 1; }
+.kitchen-world { z-index: 1; pointer-events: none; }
 .kitchen-world canvas { display: block; }
 .kitchen-hotspots { z-index: 2; pointer-events: auto; }
 .object-list {
@@ -126,7 +126,7 @@ body {
   position: absolute;
   width: 44px;
   height: 44px;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .kitchen-object-hotspot {
   transform: translate(-50%, -50%);
@@ -517,7 +517,7 @@ img, video, svg { max-width: 100%; height: auto; }
   inset: 0;
   margin: 0;
   padding: 0;
-  pointer-events: auto;
+  pointer-events: none;
 }
 .object-row {
   display: block;
@@ -703,5 +703,258 @@ img, video, svg { max-width: 100%; height: auto; }
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* Phase C Babylon prototype: active play occupies the viewport; setup remains unchanged. */
+#app[data-round-phase="RUNNING"],
+#app[data-round-phase="PAUSED"] {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+  place-items: stretch;
+}
+#app[data-round-phase="RUNNING"] .lobby-card,
+#app[data-round-phase="PAUSED"] .lobby-card {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #211914;
+  box-shadow: none;
+}
+#app[data-round-phase="RUNNING"] .operate-surface,
+#app[data-round-phase="PAUSED"] .operate-surface,
+#app[data-round-phase="RUNNING"] .role-workspace,
+#app[data-round-phase="PAUSED"] .role-workspace {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+#app[data-round-phase="RUNNING"] .role-workspace,
+#app[data-round-phase="PAUSED"] .role-workspace {
+  z-index: 25;
+  pointer-events: none;
+}
+#app[data-round-phase="RUNNING"] .role-workspace > [data-recipe-drawer],
+#app[data-round-phase="PAUSED"] .role-workspace > [data-recipe-drawer] {
+  pointer-events: auto;
+}
+#app[data-round-phase="RUNNING"] .kitchen-stage,
+#app[data-round-phase="PAUSED"] .kitchen-stage {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+.babylon-kitchen-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+  pointer-events: none;
+}
+.renderer-marker {
+  position: fixed;
+  z-index: 12;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(.65rem, env(safe-area-inset-bottom));
+  padding: .3rem .65rem;
+  border: 1px solid #fff4;
+  border-radius: 999px;
+  background: #221713b8;
+  color: #ffdfaa;
+  font-size: .68rem;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+#app[data-round-phase="RUNNING"] [data-status-rail],
+#app[data-round-phase="PAUSED"] [data-status-rail],
+#app[data-round-phase="RUNNING"] .account-surface,
+#app[data-round-phase="PAUSED"] .account-surface,
+#app[data-round-phase="RUNNING"] .operate-surface > [data-playtest-debrief-root],
+#app[data-round-phase="PAUSED"] .operate-surface > [data-playtest-debrief-root] {
+  display: none;
+}
+#app[data-round-phase="RUNNING"] [data-role-tools-drawer],
+#app[data-round-phase="PAUSED"] [data-role-tools-drawer] {
+  position: fixed;
+  z-index: 20;
+  top: max(5.5rem, calc(env(safe-area-inset-top) + 5rem));
+  right: max(1rem, env(safe-area-inset-right));
+  width: min(25rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 7rem);
+  overflow: auto;
+  pointer-events: auto;
+  box-shadow: 0 14px 36px #000b;
+}
+#app[data-round-phase="RUNNING"] [data-game-hud],
+#app[data-round-phase="PAUSED"] [data-game-hud] {
+  position: fixed;
+  z-index: 10;
+  inset: max(.75rem, env(safe-area-inset-top))
+    max(.75rem, env(safe-area-inset-right)) auto
+    max(.75rem, env(safe-area-inset-left));
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: .7rem .9rem;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #211713dc, #21171370 50%, #211713dc);
+  box-shadow: 0 8px 30px #0005;
+}
+#app[data-round-phase="RUNNING"] [data-game-hud] .round-state,
+#app[data-round-phase="PAUSED"] [data-game-hud] .round-state {
+  display: flex;
+  gap: clamp(.7rem, 3vw, 2.4rem);
+}
+#app[data-round-phase="RUNNING"] [data-round-guidance],
+#app[data-round-phase="PAUSED"] [data-round-guidance] {
+  display: none;
+}
+#app[data-round-phase="RUNNING"] .role-briefing,
+#app[data-round-phase="PAUSED"] .role-briefing {
+  position: fixed;
+  z-index: 10;
+  left: max(1rem, env(safe-area-inset-left));
+  bottom: max(2.8rem, calc(env(safe-area-inset-bottom) + 2.3rem));
+  width: min(23rem, calc(100vw - 2rem));
+  border: 1px solid #fff3;
+  border-radius: 16px;
+  background: #211713d9;
+}
+.context-prompt {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 48px;
+  padding: .5rem .9rem;
+  border: 1px solid #fff6;
+  border-radius: 999px;
+  background: #211713e8;
+  box-shadow: 0 8px 28px #0008;
+  color: #fff7e5;
+  font-weight: 850;
+  pointer-events: none;
+}
+.context-prompt kbd {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 9px;
+  background: #ffd174;
+  color: #3b2118;
+  box-shadow: inset 0 -3px 0 #b76d45;
+}
+#app[data-round-phase="RUNNING"] .kitchen-hotspots,
+#app[data-round-phase="PAUSED"] .kitchen-hotspots {
+  pointer-events: none;
+}
+#app[data-round-phase="RUNNING"] .kitchen-hotspots [data-kitchen-hotspot],
+#app[data-round-phase="PAUSED"] .kitchen-hotspots [data-kitchen-hotspot] {
+  position: absolute !important;
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  clip-path: none !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: auto;
+}
+#app[data-round-phase="RUNNING"] .kitchen-hotspots [data-kitchen-hotspot]:focus-visible,
+#app[data-round-phase="PAUSED"] .kitchen-hotspots [data-kitchen-hotspot]:focus-visible {
+  left: 50% !important;
+  bottom: 5rem !important;
+  width: auto !important;
+  height: 48px !important;
+  padding: .7rem 1rem !important;
+  clip-path: none !important;
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+.pause-overlay {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  padding: 2rem;
+  background: #1b1210d9;
+  backdrop-filter: blur(10px);
+  text-align: center;
+  pointer-events: auto;
+}
+.pause-overlay h2 { margin: .3rem 0; }
+
+@media (max-width: 900px) {
+  #app[data-round-phase="RUNNING"] [data-role-tools-drawer]:not([open]),
+  #app[data-round-phase="PAUSED"] [data-role-tools-drawer]:not([open]) {
+    width: 44px;
+    height: 44px;
+    overflow: hidden;
+  }
+  #app[data-round-phase="RUNNING"] [data-role-tools-drawer]:not([open]) > summary,
+  #app[data-round-phase="PAUSED"] [data-role-tools-drawer]:not([open]) > summary {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+    font-size: 0;
+  }
+  #app[data-round-phase="RUNNING"] [data-role-tools-drawer]:not([open]) > summary::after,
+  #app[data-round-phase="PAUSED"] [data-role-tools-drawer]:not([open]) > summary::after {
+    content: "Tools";
+    font-size: .68rem;
+    font-weight: 850;
+  }
+  #app[data-round-phase="RUNNING"] .kitchen-hotspots [data-kitchen-hotspot],
+  #app[data-round-phase="PAUSED"] .kitchen-hotspots [data-kitchen-hotspot] {
+    position: absolute !important;
+    width: 44px !important;
+    height: 44px !important;
+    padding: .35rem !important;
+    overflow: visible !important;
+    clip-path: none !important;
+    white-space: normal !important;
+    border: 1px solid #fff7 !important;
+    opacity: .92 !important;
+    pointer-events: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  #app[data-round-phase="RUNNING"] [data-game-hud],
+  #app[data-round-phase="PAUSED"] [data-game-hud] {
+    font-size: .72rem;
+  }
+  #app[data-round-phase="RUNNING"] [data-game-hud] > div:first-child,
+  #app[data-round-phase="PAUSED"] [data-game-hud] > div:first-child,
+  #app[data-round-phase="RUNNING"] [data-round-progress],
+  #app[data-round-phase="PAUSED"] [data-round-progress] {
+    display: none;
   }
 }

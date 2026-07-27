@@ -1,5 +1,4 @@
 import {
-  BLIND_COOK_INTERACTION,
   REQUIRED_PLAYER_COUNT,
   ROLE_LABELS,
 } from "@cooking-game/shared";
@@ -10,9 +9,12 @@ import type {
   LobbySnapshot,
 } from "../network/RoomClient.js";
 import {
-  PhaserKitchenWorld,
+  createKitchenWorld,
+  type KitchenRendererErrorDetail,
   type KitchenWorldAdapter,
 } from "../game/KitchenWorld.js";
+import { PlayerInputController } from "../input/PlayerInputController.js";
+import { contextualPrompt } from "../game3d/Presentation.js";
 import {
   KITCHEN_STATIONS,
   projectKitchenWorld,
@@ -30,6 +32,7 @@ export interface LobbyOptions {
   readonly monotonicNow?: () => number;
   readonly exportFeedback?: (json: string) => void;
   readonly world?: KitchenWorldAdapter;
+  readonly input?: PlayerInputController;
 }
 
 export class Lobby {
@@ -48,6 +51,8 @@ export class Lobby {
   private readonly exportFeedback: ((json: string) => void) | undefined;
   private readonly world: KitchenWorldAdapter;
   private worldMounted = false;
+  private readonly input: PlayerInputController;
+  private inputMounted = false;
   private unsubscribe: (() => void) | undefined;
   private selectedRecipe: { recipeId?: string; recipeTestToken?: string } | undefined;
 
@@ -59,7 +64,12 @@ export class Lobby {
     this.feedbackStore = new PlaytestFeedbackStore(options.storage ?? browserFeedbackStorage());
     this.monotonicNow = options.monotonicNow ?? (() => performance.now());
     this.exportFeedback = options.exportFeedback;
-    this.world = options.world ?? new PhaserKitchenWorld();
+    this.world = options.world ?? createKitchenWorld();
+    this.input = options.input ?? new PlayerInputController({
+      move: (axisX, axisZ) => this.sendMovement(axisX, axisZ),
+      interact: () => this.activateContextualAction(),
+      pause: () => this.togglePauseOverlay(),
+    });
   }
 
   mount(): void {
@@ -87,6 +97,8 @@ export class Lobby {
         </section>
 
         <section class="operate-surface" data-operate-surface hidden>
+        <div class="renderer-marker" data-renderer-marker aria-live="polite">Renderer loading</div>
+        <p class="renderer-error" data-renderer-error role="alert" hidden></p>
         <dl class="room-state" data-status-rail aria-live="polite">
           <div><dt>Connection</dt><dd data-field="connection">Disconnected</dd></div>
           <div><dt>Room ID</dt><dd data-field="room">—</dd></div>
@@ -122,6 +134,9 @@ export class Lobby {
             <div data-station-controls role="group" aria-label="Cooking station actions"></div>
             <div data-point-controls role="group" aria-label="Kitchen stations"></div>
           </div>
+          <div class="context-prompt" data-context-prompt role="status" aria-live="polite" hidden>
+            <kbd>E</kbd><span data-context-label></span><span aria-hidden="true"> · A</span>
+          </div>
         </section>
         <div class="kitchen-live-status">
           <p class="role-guidance" data-field="interaction-guidance"></p>
@@ -132,6 +147,12 @@ export class Lobby {
           <summary>Private recipe</summary>
           <section data-recipe-root aria-live="polite"></section>
         </details>
+        <section class="pause-overlay" data-pause-overlay data-input-modal aria-modal="true" role="dialog" aria-labelledby="pause-title" hidden>
+          <p class="eyebrow">Local menu</p>
+          <h2 id="pause-title">Kitchen paused on this screen</h2>
+          <p>The online round remains server-authoritative.</p>
+          <button type="button" data-resume-game>Resume</button>
+        </section>
         </section>
         <details class="role-drawer" data-role-tools-drawer>
           <summary>Role tools and kitchen signals</summary>
@@ -152,9 +173,12 @@ export class Lobby {
       this.exportFeedback,
     );
     this.unsubscribe = this.connection.subscribe((snapshot) => this.render(snapshot));
+    this.root.addEventListener("kitchenrenderererror", this.onRendererError);
     new CommunicationPanel(this.root.querySelector<HTMLElement>("[data-communication-root]")!, this.connection).mount();
     this.createButton.addEventListener("click", () => void this.connect("create"));
     this.joinButton.addEventListener("click", () => void this.connect("join"));
+    this.root.querySelector<HTMLButtonElement>("[data-resume-game]")!
+      .addEventListener("click", () => this.togglePauseOverlay(false));
 
     if (this.roomInput.value) {
       if (this.nameInput.value) {
@@ -196,11 +220,24 @@ export class Lobby {
   }
 
   destroy(): void {
+    this.root.removeEventListener("kitchenrenderererror", this.onRendererError);
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.world.destroy();
     this.worldMounted = false;
+    this.input.destroy();
+    this.inputMounted = false;
   }
+
+  private readonly onRendererError = (event: Event): void => {
+    const detail = (event as CustomEvent<KitchenRendererErrorDetail>).detail;
+    if (!detail || typeof detail.reason !== "string") return;
+    const alert = this.root.querySelector<HTMLElement>("[data-renderer-error]");
+    if (!alert) return;
+    const renderer = detail.renderer === "phaser" ? "Phaser rollback" : "Babylon 3D";
+    alert.textContent = `${renderer} renderer unavailable: ${detail.reason}`;
+    alert.hidden = false;
+  };
 
   private async connect(action: "create" | "join"): Promise<void> {
     const displayName = this.nameInput.value.trim();
@@ -242,7 +279,19 @@ export class Lobby {
         this.worldMounted = true;
       }
       this.world.update(snapshot);
+      if (!this.inputMounted) {
+        this.input.mount();
+        this.inputMounted = true;
+      }
+    } else if (this.inputMounted) {
+      this.input.destroy();
+      this.inputMounted = false;
     }
+    const renderer = this.root.querySelector<HTMLElement>("[data-kitchen-world]")!
+      .dataset.renderer ?? "babylon";
+    this.root.dataset.renderer = renderer;
+    this.root.querySelector<HTMLElement>("[data-renderer-marker]")!.textContent =
+      `${renderer === "phaser" ? "Phaser rollback" : "Babylon 3D"} renderer`;
     this.updateActionAvailability();
     this.field("connection").textContent = formatWords(snapshot.connectionStatus);
     this.field("room").textContent = snapshot.roomId ?? "—";
@@ -259,12 +308,13 @@ export class Lobby {
       this.kitchenRenderKey = kitchenRenderKey;
       this.renderRoundResult(snapshot);
       this.renderPrivateRecipe(snapshot);
-      this.renderWorldAvatars(snapshot);
       this.renderObjects(snapshot);
       this.renderStationControls(snapshot);
       this.renderPointLocations(snapshot);
     }
+    this.renderWorldAvatars(snapshot);
     this.renderDebrief(snapshot);
+    this.renderContextPrompt(snapshot);
     const interactionError = this.root.querySelector<HTMLElement>(
       ".interaction-error",
     )!;
@@ -275,6 +325,59 @@ export class Lobby {
     )!;
     cookingError.textContent = snapshot.cookingError ?? "";
     cookingError.hidden = !snapshot.cookingError;
+  }
+
+  private renderContextPrompt(snapshot: LobbySnapshot): void {
+    const root = this.root.querySelector<HTMLElement>("[data-context-prompt]")!;
+    const local = snapshot.players?.find(({ id }) => id === snapshot.sessionId);
+    const prompt = snapshot.role && local && snapshot.roundStatus
+      ? contextualPrompt({
+          role: snapshot.role,
+          x: local.x,
+          z: local.z,
+          roundStatus: snapshot.roundStatus,
+          hasHeldIngredient: snapshot.objects?.some(({ heldByMe }) => heldByMe) ?? false,
+          completedStepCount: snapshot.completedStepCount ?? 0,
+          totalStepCount: snapshot.totalStepCount ?? 0,
+        })
+      : undefined;
+    root.hidden = !prompt;
+    root.dataset.contextAction = prompt?.action ?? "";
+    root.querySelector<HTMLElement>("[data-context-label]")!.textContent =
+      prompt?.label ?? "";
+  }
+
+  private activateContextualAction(): void {
+    const prompt = this.root.querySelector<HTMLElement>("[data-context-prompt]");
+    if (!prompt || prompt.hidden) return;
+    const action = prompt.dataset.contextAction;
+    const selector = action === "PICK_UP"
+      ? "[data-pick-up]:not(:disabled)"
+      : action === "PLACE"
+        ? "[data-drop]:not(:disabled)"
+        : action === "CHOP"
+          ? '[data-cook-action="CHOP"]:not(:disabled)'
+          : action === "COOK"
+            ? "[data-station-controls] [data-cook-action]:not(:disabled)"
+            : '[data-cook-action="PLATE"]:not(:disabled)';
+    this.root.querySelector<HTMLButtonElement>(selector)?.click();
+  }
+
+  private sendMovement(axisX: number, axisZ: number): void {
+    const sequence = this.connection.move(axisX, axisZ);
+    if (sequence !== undefined) {
+      this.world.predictMovement?.(axisX, axisZ, sequence);
+    }
+  }
+
+  private togglePauseOverlay(force?: boolean): void {
+    const overlay = this.root.querySelector<HTMLElement>("[data-pause-overlay]");
+    if (!overlay) return;
+    overlay.hidden = force === undefined ? !overlay.hidden : !force;
+    if (!overlay.hidden) {
+      this.sendMovement(0, 0);
+      overlay.querySelector<HTMLButtonElement>("[data-resume-game]")?.focus();
+    }
   }
 
   private updateRunningObservation(snapshot: LobbySnapshot): void {
@@ -538,17 +641,7 @@ export class Lobby {
         button.textContent = "Drop";
         button.dataset.drop = object.id;
         button.dataset.worldAction = "";
-        button.addEventListener("click", () => {
-          const preferredX =
-            object.worldX === BLIND_COOK_INTERACTION.originX
-              ? BLIND_COOK_INTERACTION.originX + 1
-              : BLIND_COOK_INTERACTION.originX;
-          this.connection.drop(
-            object.id,
-            clamp(preferredX, 0, 100),
-            clamp(BLIND_COOK_INTERACTION.originY, 0, 60),
-          );
-        });
+        button.addEventListener("click", () => this.connection.drop(object.id));
         actionTray.append(button);
 
         if (location === "COUNTER" && preparation === "RAW") {
@@ -579,6 +672,22 @@ export class Lobby {
       "[data-kitchen-avatars]",
     )!;
     root.replaceChildren();
+    if (snapshot.players !== undefined) {
+      for (const player of snapshot.players) {
+        const label = document.createElement("span");
+        label.className = "visually-hidden";
+        label.dataset.kitchenAvatar = player.role;
+        label.dataset.sessionId = player.id;
+        label.dataset.worldX = player.x.toFixed(2);
+        label.dataset.worldZ = player.z.toFixed(2);
+        label.dataset.locomotion = player.locomotion;
+        label.dataset.connected = String(player.connected);
+        const name = player.displayName ?? ROLE_LABELS[player.role];
+        label.textContent = `${name}, ${ROLE_LABELS[player.role]}, at ${player.x.toFixed(2)}, ${player.z.toFixed(2)}, ${player.locomotion.toLowerCase()}, ${player.connected ? "connected" : "disconnected"}`;
+        root.append(label);
+      }
+      return;
+    }
     for (const avatar of projectKitchenWorld(snapshot).avatars) {
       const label = document.createElement("span");
       label.className = "visually-hidden";
@@ -809,8 +918,4 @@ function installKeyboardActivation(button: HTMLButtonElement): void {
     event.preventDefault();
     button.click();
   });
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

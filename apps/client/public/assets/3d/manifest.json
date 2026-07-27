@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "prototype": "phase-c-tasks-5-10",
+  "externalAssets": [],
+  "assets": [
+    {
+      "id": "toy-kitchen-shell-and-six-stations",
+      "format": "runtime-procedural-geometry",
+      "source": "apps/client/src/game3d/BabylonKitchenScene.ts",
+      "provenance": "PROJECT_PROCEDURAL",
+      "license": "PROJECT_OWNED"
+    },
+    {
+      "id": "three-monkey-role-presenters",
+      "format": "runtime-procedural-geometry",
+      "source": "apps/client/src/game3d/BabylonKitchenScene.ts",
+      "provenance": "PROJECT_PROCEDURAL",
+      "license": "PROJECT_OWNED"
+    },
+    {
+      "id": "warm-toy-pbr-palette",
+      "format": "runtime-procedural-materials",
+      "source": "apps/client/src/game3d/BabylonKitchenScene.ts",
+      "provenance": "PROJECT_PROCEDURAL",
+      "license": "PROJECT_OWNED"
+    },
+    {
+      "id": "minimal-edge-hud-glyphs",
+      "format": "semantic-html-css",
+      "source": "apps/client/src/ui/Lobby.ts",
+      "provenance": "PROJECT_PROCEDURAL",
+      "license": "PROJECT_OWNED"
+    }
+  ],
+  "referencePolicy": "Approved images informed mood, proportions, readability, and composition only. No pixels, meshes, textures, logos, or protected assets were copied."
+}

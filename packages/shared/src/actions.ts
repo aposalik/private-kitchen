@@ -3,6 +3,7 @@ import { z } from "zod";
 import { KITCHEN_OBJECT_KINDS } from "./game-state.js";
 
 export const KITCHEN_MESSAGES = {
+  movementIntent: "MOVEMENT_INTENT",
   pickUp: "PICK_UP",
   drop: "DROP",
   interactionError: "INTERACTION_ERROR",
@@ -61,6 +62,7 @@ export const COOKING_ERROR_CODES = [
   "REPLAYED_ACTION",
   "OBJECT_NOT_FOUND",
   "OBJECT_NOT_OWNED",
+  "OUT_OF_REACH",
   "INVALID_PREPARATION",
   "OUT_OF_ORDER",
   "ROUND_TERMINAL",

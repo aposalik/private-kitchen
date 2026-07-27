@@ -551,7 +551,7 @@ async function pickUp(room: ClientRoom<KitchenRoomState>, objectId: string): Pro
 }
 
 async function drop(room: ClientRoom<KitchenRoomState>, objectId: string): Promise<void> {
-  room.send(KITCHEN_MESSAGES.drop, { objectId, x: 50, y: 30 });
+  room.send(KITCHEN_MESSAGES.drop, { objectId });
   await waitForState(room, (state) => state.objects.get(objectId)?.heldBy === "");
 }
 

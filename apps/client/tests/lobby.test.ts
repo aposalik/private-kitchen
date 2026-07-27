@@ -179,6 +179,53 @@ describe("Lobby", () => {
     expect(root.textContent).toContain("Ready");
   });
 
+  test("updates semantic player markers from every authoritative movement snapshot", async () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection).mount();
+
+    const player = {
+      id: "blind-session",
+      displayName: "Moving Cook",
+      role: "BLIND_COOK" as const,
+      connected: true,
+      z: 30,
+      facingYaw: 0,
+      locomotion: "MOVE" as const,
+      lastProcessedMovementSequence: 1,
+    };
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      roomId: "ROOM123",
+      sessionId: player.id,
+      role: player.role,
+      connectedCount: 3,
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+      players: [{ ...player, x: 50 }],
+    });
+    const marker = root.querySelector<HTMLElement>(
+      '[data-kitchen-avatar="BLIND_COOK"]',
+    )!;
+    expect(marker.dataset.worldX).toBe("50.00");
+    expect(marker.textContent).toContain("Moving Cook");
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      roomId: "ROOM123",
+      sessionId: player.id,
+      role: player.role,
+      connectedCount: 3,
+      roomStatus: "READY",
+      roundStatus: "RUNNING",
+      players: [{ ...player, x: 57.25, lastProcessedMovementSequence: 2 }],
+    });
+    expect(root.querySelector<HTMLElement>(
+      '[data-kitchen-avatar="BLIND_COOK"]',
+    )!.dataset.worldX).toBe("57.25");
+  });
+
   test("exposes stable view state and swaps setup for the connected Operate surface", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
@@ -443,7 +490,7 @@ describe("Lobby", () => {
       ],
     });
     root.querySelector<HTMLButtonElement>('[data-drop="ingredient-1"]')!.click();
-    expect(connection.drop).toHaveBeenCalledWith("ingredient-1", 50, 30);
+    expect(connection.drop).toHaveBeenCalledWith("ingredient-1");
   });
 
   test("Blind Cook object rows show authoritative context and exclude POT and RUINED pickup", () => {
@@ -847,8 +894,9 @@ class FakeConnection implements LobbyConnection {
   create = vi.fn(async (_displayName: string) => undefined);
   join = vi.fn(async (_roomId: string, _displayName: string) => undefined);
   resume = vi.fn(async () => false);
+  move = vi.fn((_axisX: number, _axisZ: number) => 1);
   pickUp = vi.fn((_objectId: string) => undefined);
-  drop = vi.fn((_objectId: string, _x: number, _y: number) => undefined);
+  drop = vi.fn((_objectId: string) => undefined);
   chop = vi.fn((_objectId: string) => undefined);
   addToPot = vi.fn((_objectId: string) => undefined);
   season = vi.fn(() => undefined);

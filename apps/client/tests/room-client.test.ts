@@ -21,6 +21,75 @@ import {
 } from "../src/network/RoomClient.js";
 
 describe("RoomClient lifecycle", () => {
+  test("sends sequenced movement axes and snapshots authoritative transforms", async () => {
+    const transport = new FakeTransport();
+    const room = new FakeRoom("movement-session", "token");
+    transport.create.mockResolvedValue(room);
+    const storage = new FakeStorage();
+    const client = new RoomClient({ transport, storage });
+    const snapshots = observe(client);
+    const connecting = client.create("Moving Player");
+    await Promise.resolve();
+    room.setAuthoritativePlayer("BLIND_COOK");
+    await connecting;
+
+    client.move(0.6, -0.8);
+    client.move(1, 1);
+
+    expect(room.sent).toContainEqual([
+      "MOVEMENT_INTENT",
+      { sequence: 1, axisX: 0.6, axisZ: -0.8 },
+    ]);
+    expect(room.sent.filter(([type]) => type === "MOVEMENT_INTENT")).toHaveLength(1);
+    expect(storage.getItem("kitchen.movementSequence")).toBe("1");
+    expect(snapshots.at(-1)?.players).toEqual([
+      {
+        id: "movement-session",
+        displayName: "Player",
+        role: "BLIND_COOK",
+        connected: true,
+        x: 50,
+        z: 30,
+        facingYaw: 0,
+        locomotion: "IDLE",
+        lastProcessedMovementSequence: 0,
+      },
+    ]);
+  });
+
+  test("coalesces frame-rate movement calls to the configured send interval", async () => {
+    vi.useFakeTimers();
+    try {
+      const transport = new FakeTransport();
+      const room = new FakeRoom("movement-throttle", "token");
+      transport.create.mockResolvedValue(room);
+      const storage = new FakeStorage();
+      const client = new RoomClient({ transport, storage });
+      const connecting = client.create("Moving Player");
+      await Promise.resolve();
+      room.setAuthoritativePlayer("BLIND_COOK");
+      await connecting;
+
+      expect(client.move(1, 0)).toBe(1);
+      expect(client.move(0.5, 0)).toBe(2);
+      expect(client.move(0, 0)).toBe(2);
+      expect(room.sent.filter(([type]) => type === "MOVEMENT_INTENT")).toEqual([
+        ["MOVEMENT_INTENT", { sequence: 1, axisX: 1, axisZ: 0 }],
+      ]);
+
+      await vi.advanceTimersByTimeAsync(49);
+      expect(room.sent.filter(([type]) => type === "MOVEMENT_INTENT")).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(room.sent.filter(([type]) => type === "MOVEMENT_INTENT")).toEqual([
+        ["MOVEMENT_INTENT", { sequence: 1, axisX: 1, axisZ: 0 }],
+        ["MOVEMENT_INTENT", { sequence: 2, axisX: 0, axisZ: 0 }],
+      ]);
+      expect(storage.getItem("kitchen.movementSequence")).toBe("2");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("replicates authoritative round progress and object preparation/location without deriving state", async () => {
     const transport = new FakeTransport();
     const room = new FakeRoom("round-session", "token");
@@ -810,6 +879,11 @@ class FakeRoom implements RoomClientRoom {
             displayName: "Player",
             role,
             connected: true,
+            x: 50,
+            z: 30,
+            facingYaw: 0,
+            locomotion: "IDLE",
+            lastProcessedMovementSequence: 0,
           },
         ],
       ]),

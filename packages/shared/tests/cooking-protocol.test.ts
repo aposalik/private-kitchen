@@ -98,6 +98,7 @@ describe("Phase 4 finite cooking protocol", () => {
 
   test("defines finite cooking responses and an idempotent empty ROUND_READY payload", () => {
     expect(KITCHEN_MESSAGES).toMatchObject({
+      movementIntent: "MOVEMENT_INTENT",
       cookingError: "COOKING_ERROR",
       roundReady: "ROUND_READY",
       privateRecipe: "PRIVATE_RECIPE",
@@ -111,6 +112,7 @@ describe("Phase 4 finite cooking protocol", () => {
       "REPLAYED_ACTION",
       "OBJECT_NOT_FOUND",
       "OBJECT_NOT_OWNED",
+      "OUT_OF_REACH",
       "INVALID_PREPARATION",
       "OUT_OF_ORDER",
       "ROUND_TERMINAL",

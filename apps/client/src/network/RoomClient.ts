@@ -11,6 +11,7 @@ import {
   KITCHEN_MESSAGES,
   KITCHEN_ROOM_NAME,
   MAX_ACTION_SEQUENCE,
+  MOVEMENT_SEND_INTERVAL_MS,
   MAX_OBJECT_ID_LENGTH,
   RECIPE_CARDS,
   MAX_ICE_CANDIDATE_LENGTH,
@@ -22,6 +23,7 @@ import {
   cookingErrorSchema,
   isPlayerRole,
   privateRecipeSchema,
+  movementIntentSchema,
   type CommunicationEvent,
   type DrawingColor,
   type DrawingStroke,
@@ -30,6 +32,7 @@ import {
   type Gesture,
   type InteractionErrorPayload,
   type KitchenObjectKind,
+  type MovementIntent,
   type KitchenObjectLocation,
   type KitchenObjectPreparation,
   type KitchenJoinOptions,
@@ -76,7 +79,19 @@ export interface LobbySnapshot {
   communicationFeed?: readonly CommunicationEvent[];
   drawingStrokes?: readonly DrawingStroke[];
   voiceGrant?: VoiceGrant;
-  players?: readonly { id: string; role: PlayerRole }[];
+  players?: readonly LobbyPlayerSnapshot[];
+}
+
+export interface LobbyPlayerSnapshot {
+  readonly id: string;
+  readonly displayName?: string;
+  readonly role: PlayerRole;
+  readonly connected: boolean;
+  readonly x: number;
+  readonly z: number;
+  readonly facingYaw: number;
+  readonly locomotion: "IDLE" | "MOVE";
+  readonly lastProcessedMovementSequence: number;
 }
 
 export interface LobbyObjectSnapshot {
@@ -98,8 +113,9 @@ export interface LobbyConnection {
   ): Promise<void>;
   join(roomId: string, displayName: string): Promise<void>;
   resume(): Promise<boolean>;
+  move(axisX: number, axisZ: number): number | undefined;
   pickUp(objectId: string): void;
-  drop(objectId: string, x: number, y: number): void;
+  drop(objectId: string): void;
   chop(objectId: string): void;
   addToPot(objectId: string): void;
   season(): void;
@@ -163,6 +179,7 @@ interface RoomClientOptions {
 const RECONNECTION_TOKEN_KEY = "kitchen.reconnectionToken";
 const COOKING_ACTION_SEQUENCE_KEY = "kitchen.cookingActionSequence";
 const COMMUNICATION_SEQUENCE_KEY = "kitchen.communicationSequence";
+const MOVEMENT_SEQUENCE_KEY = "kitchen.movementSequence";
 
 export class RoomClient implements LobbyConnection {
   private readonly transport: RoomClientTransport;
@@ -179,6 +196,10 @@ export class RoomClient implements LobbyConnection {
   private voiceGrant: VoiceGrant | undefined;
   private clientSequence = 0;
   private cookingActionSequence = 0;
+  private movementSequence = 0;
+  private pendingMovement: MovementIntent | undefined;
+  private movementTimer: number | undefined;
+  private lastMovementSentAt: number | undefined;
   private readonly voiceListeners = new Set<(relay: VoiceRelayEnvelope) => void>();
 
   constructor(endpointOrOptions: string | RoomClientOptions = defaultEndpoint()) {
@@ -225,6 +246,9 @@ export class RoomClient implements LobbyConnection {
     this.clientSequence = parseStoredSequence(
       this.storage.getItem(COMMUNICATION_SEQUENCE_KEY),
     );
+    this.movementSequence = parseStoredSequence(
+      this.storage.getItem(MOVEMENT_SEQUENCE_KEY),
+    );
     const operation = this.resumeToken(token);
     this.track(operation);
     return operation;
@@ -241,9 +265,41 @@ export class RoomClient implements LobbyConnection {
     this.room?.send(KITCHEN_MESSAGES.pickUp, { objectId });
   }
 
-  drop(objectId: string, x: number, y: number): void {
+  move(axisX: number, axisZ: number): number | undefined {
+    if (!this.room || this.movementSequence >= MAX_ACTION_SEQUENCE) return undefined;
+    if (this.pendingMovement) {
+      const parsed = movementIntentSchema.safeParse({
+        sequence: this.pendingMovement.sequence,
+        axisX,
+        axisZ,
+      });
+      if (!parsed.success) return undefined;
+      this.pendingMovement = parsed.data;
+      return parsed.data.sequence;
+    }
+    const sequence = this.movementSequence + 1;
+    const parsed = movementIntentSchema.safeParse({ sequence, axisX, axisZ });
+    if (!parsed.success) return undefined;
+    this.movementSequence = sequence;
+    this.storage.setItem(MOVEMENT_SEQUENCE_KEY, String(sequence));
+    const elapsed = this.lastMovementSentAt === undefined
+      ? MOVEMENT_SEND_INTERVAL_MS
+      : Date.now() - this.lastMovementSentAt;
+    if (elapsed >= MOVEMENT_SEND_INTERVAL_MS) {
+      this.sendMovementIntent(parsed.data);
+    } else {
+      this.pendingMovement = parsed.data;
+      this.movementTimer = window.setTimeout(
+        () => this.flushPendingMovement(),
+        MOVEMENT_SEND_INTERVAL_MS - Math.max(0, elapsed),
+      );
+    }
+    return sequence;
+  }
+
+  drop(objectId: string): void {
     this.interactionError = undefined;
-    this.room?.send(KITCHEN_MESSAGES.drop, { objectId, x, y });
+    this.room?.send(KITCHEN_MESSAGES.drop, { objectId });
   }
 
   chop(objectId: string): void {
@@ -295,6 +351,7 @@ export class RoomClient implements LobbyConnection {
         this.storage.removeItem(RECONNECTION_TOKEN_KEY);
         this.clearCookingSequence();
         this.clearCommunicationSequence();
+        this.clearMovementSequence();
         this.emit({ connectionStatus: "DISCONNECTED" });
       }
       return false;
@@ -354,6 +411,7 @@ export class RoomClient implements LobbyConnection {
         this.storage.removeItem(RECONNECTION_TOKEN_KEY);
         this.clearCookingSequence();
         this.clearCommunicationSequence();
+        this.clearMovementSequence();
         this.emit({ connectionStatus: "DISCONNECTED" });
         if (!ready) {
           reject(new Error(message));
@@ -484,7 +542,19 @@ export class RoomClient implements LobbyConnection {
       ...(typeof state?.totalStepCount === "number" ? { totalStepCount: state.totalStepCount } : {}),
       ...(state?.outcomeReason ? { outcomeReason: state.outcomeReason } : {}),
       objects,
-      ...(state?.players ? { players: Array.from(state.players.values(), ({ id, role: playerRole }) => ({ id, role: playerRole })) } : {}),
+      ...(state?.players ? {
+        players: Array.from(state.players.values(), (current) => ({
+          id: current.id,
+          displayName: current.displayName,
+          role: current.role,
+          connected: current.connected,
+          x: current.x,
+          z: current.z,
+          facingYaw: current.facingYaw,
+          locomotion: current.locomotion,
+          lastProcessedMovementSequence: current.lastProcessedMovementSequence,
+        })),
+      } : {}),
       ...(this.interactionError ? { interactionError: this.interactionError } : {}),
       ...(this.cookingError ? { cookingError: this.cookingError } : {}),
       ...(role === "RECIPE_KEEPER" && this.privateRecipe
@@ -505,6 +575,7 @@ export class RoomClient implements LobbyConnection {
 
     this.clearCookingSequence();
     this.clearCommunicationSequence();
+    this.clearMovementSequence();
     const operation = this.connect(joinRoom);
     this.track(operation);
     return operation;
@@ -526,6 +597,7 @@ export class RoomClient implements LobbyConnection {
         this.storage.removeItem(RECONNECTION_TOKEN_KEY);
         this.clearCookingSequence();
         this.clearCommunicationSequence();
+        this.clearMovementSequence();
         this.emit({ connectionStatus: "DISCONNECTED" });
       }
       throw error;
@@ -592,6 +664,28 @@ export class RoomClient implements LobbyConnection {
   private clearCommunicationSequence(): void {
     this.clientSequence = 0;
     this.storage.removeItem(COMMUNICATION_SEQUENCE_KEY);
+  }
+
+  private sendMovementIntent(intent: MovementIntent): void {
+    if (!this.room) return;
+    this.room.send(KITCHEN_MESSAGES.movementIntent, intent);
+    this.lastMovementSentAt = Date.now();
+  }
+
+  private flushPendingMovement(): void {
+    this.movementTimer = undefined;
+    const intent = this.pendingMovement;
+    this.pendingMovement = undefined;
+    if (intent) this.sendMovementIntent(intent);
+  }
+
+  private clearMovementSequence(): void {
+    if (this.movementTimer !== undefined) window.clearTimeout(this.movementTimer);
+    this.movementTimer = undefined;
+    this.pendingMovement = undefined;
+    this.lastMovementSentAt = undefined;
+    this.movementSequence = 0;
+    this.storage.removeItem(MOVEMENT_SEQUENCE_KEY);
   }
 
   private currentCanSeeVisual(): boolean {

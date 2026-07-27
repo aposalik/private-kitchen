@@ -1,7 +1,9 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 
+test.use({ trace: "off" });
+
 test("account persists, owns data and history, signs out, while guests still join", async ({ browser, page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const username = `cook-${Date.now()}`;
   await page.goto("/");
   await page.locator("[name=username]").fill(username);

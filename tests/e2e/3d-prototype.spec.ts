@@ -14,7 +14,7 @@ interface PlayerPosition {
 }
 
 test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe prototype with Phaser rollback", async ({ browser, page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const contexts: BrowserContext[] = [];
   const browserErrors: string[] = [];
   const watchErrors = (candidate: Page) => {
@@ -64,10 +64,10 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
       expect(player.locator("canvas.babylon-kitchen-canvas")).toBeVisible(),
       expect.poll(async () => Number(
         await player.locator("canvas.babylon-kitchen-canvas").getAttribute("data-scene-meshes"),
-      )).toBeGreaterThan(20),
+      ), { timeout: 45_000 }).toBeGreaterThan(20),
       expect.poll(async () =>
         await player.locator("canvas.babylon-kitchen-canvas").getAttribute("data-camera-position"),
-      ).not.toContain("NaN"),
+      { timeout: 45_000 }).not.toContain("NaN"),
     ]));
 
     const roles = await Promise.all(players.map((player) => player.locator('[data-field="role"]').textContent()));

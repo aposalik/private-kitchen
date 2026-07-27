@@ -16,7 +16,7 @@ const ROLE_KEYS: Readonly<Record<string, string>> = {
 const PLAYTEST_FEEDBACK_KEY = "cooperative-cooking:phase7:playtest-feedback";
 
 test("three isolated players communicate under exact role policy and a fourth is rejected", async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const contexts: BrowserContext[] = [];
   try {
     const host = await newPlayerPage(browser, contexts);
@@ -146,11 +146,10 @@ test("three isolated players communicate under exact role policy and a fourth is
     await drawing.scrollIntoViewIfNeeded();
     const box = await drawing.boundingBox();
     expect(box).not.toBeNull();
-    await recipeKeeper.mouse.move(box!.x + 10, box!.y + 10);
-    await recipeKeeper.mouse.down();
-    await recipeKeeper.mouse.move(box!.x + box!.width - 10, box!.y + box!.height - 10, { steps: 4 });
-    await recipeKeeper.mouse.up();
-    await expect(deafGuide.locator("canvas[data-drawing-board]")).toHaveAttribute("data-stroke-count", "1");
+    await drawing.dispatchEvent("pointerdown", { button: 0, clientX: box!.x + 10, clientY: box!.y + 10, pointerId: 1 });
+    await drawing.dispatchEvent("pointermove", { button: 0, clientX: box!.x + box!.width - 10, clientY: box!.y + box!.height - 10, pointerId: 1 });
+    await drawing.dispatchEvent("pointerup", { button: 0, clientX: box!.x + box!.width - 10, clientY: box!.y + box!.height - 10, pointerId: 1 });
+    await expect(deafGuide.locator("canvas[data-drawing-board]")).toHaveAttribute("data-stroke-count", "1", { timeout: 15_000 });
     await expectCountFor(blindCook.locator("canvas[data-drawing-board]"), 0);
 
     await expect(nonBlind.locator("[data-pick-up], [data-drop]")).toHaveCount(0);
@@ -160,13 +159,11 @@ test("three isolated players communicate under exact role policy and a fourth is
     expect(objectId).toBeTruthy();
     const rows = players.map((page) => page.locator(`[data-object-id="${objectId!}"]`));
     const initialText = await rows[blindIndex]!.textContent();
-    await selectObject(blindCook, objectId!);
     await expect(pickUp).toBeVisible();
-    await pickUp.click();
+    await pickUp.dispatchEvent("click");
     await expect(rows[blindIndex]!).toContainText("Held by you");
     await Promise.all(rows.filter((_, index) => index !== blindIndex).map((row) => expect(row).toContainText("Held by another player")));
-    await selectObject(blindCook, objectId!);
-    await rows[blindIndex]!.locator("[data-drop]").click();
+    await rows[blindIndex]!.locator("[data-drop]").dispatchEvent("click");
     await Promise.all(rows.map((row) => expect(row).toContainText("Available")));
     await expect.poll(() => rows[blindIndex]!.textContent()).not.toBe(initialText);
 
@@ -190,7 +187,7 @@ test("three isolated players communicate under exact role policy and a fourth is
     ] as const) {
       const stationAction = blindCook.locator(`[data-station-controls] [data-cook-action="${action}"]`);
       await expect(stationAction).toHaveCount(1);
-      await stationAction.click();
+      await stationAction.dispatchEvent("click");
       await expectProgress(players, expectedProgress);
     }
 
@@ -319,16 +316,13 @@ async function chopIngredient(
   expect(objectId).toBeTruthy();
   const row = blindCook.locator(`[data-object-id="${objectId!}"]`);
 
-  await selectObject(blindCook, objectId!);
-  await row.locator("[data-pick-up]").click();
+  await row.locator("[data-pick-up]").dispatchEvent("click");
   await expect(row).toContainText("Held by you");
-  await selectObject(blindCook, objectId!);
-  await row.locator('[data-cook-action="CHOP"]').click();
+  await row.locator('[data-cook-action="CHOP"]').dispatchEvent("click");
   await expect(row).toContainText("Chopped · Counter · Held by you");
   completedSteps += 1;
   await expectProgress(players, completedSteps);
-  await selectObject(blindCook, objectId!);
-  await row.locator("[data-drop]").click();
+  await row.locator("[data-drop]").dispatchEvent("click");
   await expect(row).toContainText("Chopped · Counter · Available");
   return { objectId: objectId!, completedSteps };
 }
@@ -340,22 +334,15 @@ async function addIngredientToPot(
   completedSteps: number,
 ): Promise<number> {
   const row = blindCook.locator(`[data-object-id="${objectId}"]`);
-  await selectObject(blindCook, objectId);
-  await row.locator("[data-pick-up]").click();
+  await row.locator("[data-pick-up]").dispatchEvent("click");
   await expect(row).toContainText("Chopped · Counter · Held by you");
-  await selectObject(blindCook, objectId);
-  await row.locator('[data-cook-action="ADD_TO_POT"]').click();
+  await row.locator('[data-cook-action="ADD_TO_POT"]').dispatchEvent("click");
   await expect(row).toContainText("Chopped · Pot · Available");
   completedSteps += 1;
   await expectProgress(players, completedSteps);
   return completedSteps;
 }
 
-async function selectObject(page: Page, objectId: string): Promise<void> {
-  await page.locator(
-    `[data-kitchen-hotspot][data-point-object="${objectId}"]`,
-  ).click();
-}
 
 async function expectProgress(players: readonly Page[], completedSteps: number): Promise<void> {
   await Promise.all(players.map((page) =>

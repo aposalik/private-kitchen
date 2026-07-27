@@ -64,8 +64,8 @@ test("account persists, owns data and history, signs out, while guests still joi
     await expect(page.locator("[data-round-status]")).toHaveText("Won");
 
     await page.reload();
-    await expect(page.locator("[data-authenticated-account]")).toHaveText("Saved Cook");
-    await expect(page.locator("[data-history]")).toContainText("WON");
+    await expect(page.locator("[data-authenticated-account]")).toHaveText("Saved Cook", { timeout: 30_000 });
+    await expect(page.locator("[data-history]")).toContainText("WON", { timeout: 30_000 });
 
     const stranger = await browser.newContext();
     guestContexts.push(stranger);

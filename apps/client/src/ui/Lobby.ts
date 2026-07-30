@@ -26,6 +26,7 @@ import {
   renderRoleBriefing,
   type RoleBriefingPhase,
 } from "./RoleBriefing.js";
+import { CharacterSelect } from "./CharacterSelect.js";
 
 export interface LobbyOptions {
   readonly storage?: Storage;
@@ -249,6 +250,12 @@ export class Lobby {
 
     this.showError();
     this.setDisabled(true);
+
+    // Show character selection before joining the room
+    const cs = new CharacterSelect(this.root);
+    const { characterId } = await cs.show();
+    (window as any).__selectedCharacter = characterId;
+
     try {
       if (action === "create") {
         if (this.selectedRecipe) {

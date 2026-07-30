@@ -34,6 +34,8 @@ export interface LobbyOptions {
   readonly exportFeedback?: (json: string) => void;
   readonly world?: KitchenWorldAdapter;
   readonly input?: PlayerInputController;
+  /** Override character selection for tests; defaults to showing CharacterSelect UI. */
+  readonly pickCharacter?: () => Promise<{ characterId: string }>;
 }
 
 export class Lobby {
@@ -57,6 +59,8 @@ export class Lobby {
   private unsubscribe: (() => void) | undefined;
   private selectedRecipe: { recipeId?: string; recipeTestToken?: string } | undefined;
 
+  private readonly pickCharacter: () => Promise<{ characterId: string }>;
+
   constructor(
     private readonly root: HTMLElement,
     private readonly connection: LobbyConnection,
@@ -71,6 +75,8 @@ export class Lobby {
       interact: () => this.activateContextualAction(),
       pause: () => this.togglePauseOverlay(),
     });
+    this.pickCharacter = options.pickCharacter ??
+      (() => new CharacterSelect(this.root).show());
   }
 
   mount(): void {
@@ -251,9 +257,7 @@ export class Lobby {
     this.showError();
     this.setDisabled(true);
 
-    // Show character selection before joining the room
-    const cs = new CharacterSelect(this.root);
-    const { characterId } = await cs.show();
+    const { characterId } = await this.pickCharacter();
     (window as any).__selectedCharacter = characterId;
 
     try {

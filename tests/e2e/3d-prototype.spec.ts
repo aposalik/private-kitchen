@@ -51,7 +51,8 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await expect(page.locator("[data-selected-recipe]")).toContainText("private test");
 
     await page.locator('[data-action="create"]').click();
-    await expect(page.locator('[data-field="room"]')).not.toHaveText("—");
+    await pickFirstCharacter(page);
+    await expect(page.locator('[data-field="room"]')).not.toHaveText("—", { timeout: 30_000 });
     const roomId = (await page.locator('[data-field="room"]').textContent())!.trim();
 
     const keeper = await guest(browser, contexts, roomId, "Phase C Keeper", watchErrors);
@@ -148,6 +149,7 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await rollback.goto("/?renderer=phaser");
     await rollback.locator(".join-panel [name=displayName]").fill("Rollback Cook");
     await rollback.locator('[data-action="create"]').click();
+    await pickFirstCharacter(rollback);
     await expect(rollback.locator('[data-kitchen-world][data-renderer="phaser"]'))
       .toHaveAttribute("data-renderer-state", "ready", { timeout: 45_000 });
     await expect(rollback.locator('[data-kitchen-world][data-renderer="phaser"] canvas')).toHaveCount(1);
@@ -158,6 +160,11 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await Promise.allSettled(contexts.map((context) => context.close()));
   }
 });
+
+async function pickFirstCharacter(page: Page): Promise<void> {
+  await page.locator('#character-select .cs-char').first().click();
+  await page.locator('#cs-confirm').click();
+}
 
 async function guest(
   browser: Browser,
@@ -172,6 +179,7 @@ async function guest(
   page.setDefaultTimeout(15_000);
   watchErrors(page);
   await page.goto(`/?${new URLSearchParams({ room: roomId, player })}`);
+  await pickFirstCharacter(page);
   return page;
 }
 

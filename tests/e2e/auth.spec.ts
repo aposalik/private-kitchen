@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 test.use({ trace: "off" });
 
@@ -49,7 +50,8 @@ test("account persists, owns data and history, signs out, while guests still joi
   await expect(page.locator("[data-selected-recipe]")).toContainText("private test");
 
   await page.locator('[data-action="create"]').click();
-  await expect(page.locator('[data-field="room"]')).not.toHaveText("—");
+  await pickFirstCharacter(page);
+  await expect(page.locator('[data-field="room"]')).not.toHaveText("—", { timeout: 30_000 });
   const roomId = (await page.locator('[data-field="room"]').textContent())!.trim();
   expect(roomId).not.toBe("—");
   const guestContexts: BrowserContext[] = [];
@@ -101,6 +103,7 @@ async function guest(browser: Browser, contexts: BrowserContext[], roomId: strin
   contexts.push(context);
   const page = await context.newPage();
   await page.goto(`/?${new URLSearchParams({ room: roomId, player })}`);
+  await pickFirstCharacter(page);
   return page;
 }
 

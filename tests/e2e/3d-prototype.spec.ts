@@ -5,6 +5,7 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 const EVIDENCE_DIR = ".hermes/tmp/phasec-live";
 
@@ -160,11 +161,6 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await Promise.allSettled(contexts.map((context) => context.close()));
   }
 });
-
-async function pickFirstCharacter(page: Page): Promise<void> {
-  await page.locator('#character-select .cs-char').first().click();
-  await page.locator('#cs-confirm').click();
-}
 
 async function guest(
   browser: Browser,

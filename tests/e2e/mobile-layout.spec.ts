@@ -5,6 +5,7 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 test("touch landscape creates, reconnects, and performs authoritative Blind Cook pickup/drop", async ({ browser, page, baseURL }) => {
   test.setTimeout(90_000);
@@ -25,9 +26,10 @@ test("touch landscape creates, reconnects, and performs authoritative Blind Cook
 
     await page.locator(".join-panel [name=displayName]").fill("Mobile Host");
     await page.locator("[data-action=create]").tap();
+    await pickFirstCharacter(page);
     const room = page.locator('[data-field="room"]');
     const role = page.locator('[data-field="role"]');
-    await expect(room).not.toHaveText("—");
+    await expect(room).not.toHaveText("—", { timeout: 30_000 });
     await expect(role).toHaveText("Blind Cook");
     const roomId = (await room.textContent())!.trim();
 
@@ -116,6 +118,7 @@ async function helper(
   const page = await context.newPage();
   const query = new URLSearchParams({ room: roomId, player: playerName });
   await page.goto(`/?${query.toString()}`);
+  await pickFirstCharacter(page);
   return page;
 }
 

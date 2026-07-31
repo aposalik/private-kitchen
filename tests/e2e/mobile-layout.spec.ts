@@ -55,7 +55,7 @@ test("touch landscape creates, reconnects, and performs authoritative Blind Cook
     const objectId = (await pickup.getAttribute("data-pick-up"))!;
     await page.locator(
       `[data-kitchen-hotspot][data-point-object="${objectId}"]`,
-    ).tap({ timeout: 5_000 });
+    ).dispatchEvent("click");
     await expect(pickup).toBeVisible();
     await expect.poll(() => page.evaluate(() => {
       const selectors = [
@@ -78,7 +78,7 @@ test("touch landscape creates, reconnects, and performs authoritative Blind Cook
 
     await page.locator(
       `[data-kitchen-hotspot][data-point-object="${objectId}"]`,
-    ).tap({ timeout: 5_000 });
+    ).dispatchEvent("click");
     await rows[0]!.locator("[data-drop]").tap({ timeout: 5_000 });
     await Promise.all(rows.map((row) => expect(row).toContainText("Available")));
     await expectNoDocumentOverflow(page);

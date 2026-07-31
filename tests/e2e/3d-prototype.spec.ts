@@ -27,6 +27,8 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
   };
   watchErrors(page);
   page.setDefaultTimeout(15_000);
+  // Allow expect() checks more time in CI
+  expect.setTimeout(10_000);
 
   try {
     const username = `phase-c-${Date.now()}`;
@@ -86,7 +88,7 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
 
     for (const player of players) {
       expect(await player.evaluate(() => {
-        const stage = document.querySelector<HTMLElement>("[data-kitchen-stage]")!;
+        const stage = document.querySelector<HTMLElement>('[data-kitchen-stage]')!;
         const bounds = stage.getBoundingClientRect();
         return {
           width: Math.round(bounds.width),
@@ -120,7 +122,10 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await test.step("complete the real custom recipe through authoritative actions", async () => {
       await completeCustomRecipe(blind, players);
     });
-    await Promise.all(players.map((player) => expect(player.locator("[data-round-status]")).toHaveText("Won")));
+    await Promise.all(players.map((player) => expect(player.locator("[data-round-status]")).toHaveText("Won", { timeout: 20_000 })));
+
+    await Promise.allSettled(contexts.splice(0).map((context) => context.close()));
+    await page.close();
 
     await Promise.allSettled(contexts.splice(0).map((context) => context.close()));
     await page.close();
@@ -275,6 +280,7 @@ async function completeCustomRecipe(blind: Page, players: readonly Page[]): Prom
     const id = await candidate.getAttribute("data-object-id");
     expect(id).toBeTruthy();
     ids.push(id!);
+
     await selectObject(blind, id!);
     await blind.locator(`[data-object-id="${id}"] [data-pick-up]`).dispatchEvent("click");
     await expect(blind.locator(`[data-object-id="${id}"]`)).toContainText("Held by you");

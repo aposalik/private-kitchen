@@ -5,6 +5,7 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 const EVIDENCE_DIR = ".hermes/tmp/phasec-live";
 
@@ -25,6 +26,8 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
   };
   watchErrors(page);
   page.setDefaultTimeout(15_000);
+  // Allow expect() checks more time in CI
+  expect.setTimeout(10_000);
 
   try {
     const username = `phase-c-${Date.now()}`;
@@ -51,7 +54,8 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await expect(page.locator("[data-selected-recipe]")).toContainText("private test");
 
     await page.locator('[data-action="create"]').click();
-    await expect(page.locator('[data-field="room"]')).not.toHaveText("—");
+    await pickFirstCharacter(page);
+    await expect(page.locator('[data-field="room"]')).not.toHaveText("—", { timeout: 30_000 });
     const roomId = (await page.locator('[data-field="room"]').textContent())!.trim();
 
     const keeper = await guest(browser, contexts, roomId, "Phase C Keeper", watchErrors);
@@ -83,7 +87,7 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
 
     for (const player of players) {
       expect(await player.evaluate(() => {
-        const stage = document.querySelector<HTMLElement>("[data-kitchen-stage]")!;
+        const stage = document.querySelector<HTMLElement>('[data-kitchen-stage]')!;
         const bounds = stage.getBoundingClientRect();
         return {
           width: Math.round(bounds.width),
@@ -107,23 +111,24 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     )));
 
     const moves = [
-      { page: blind, role: "BLIND_COOK", key: "s" },
-      { page: recipeKeeper, role: "RECIPE_KEEPER", key: "a" },
-      { page: deafGuide, role: "DEAF_KITCHEN_GUIDE", key: "d" },
+      { page: blind, role: "BLIND_COOK", key: "s", durationMs: 100 },
+      { page: recipeKeeper, role: "RECIPE_KEEPER", key: "a", durationMs: 350 },
+      { page: deafGuide, role: "DEAF_KITCHEN_GUIDE", key: "d", durationMs: 350 },
     ] as const;
     const before = await Promise.all(moves.map(({ page: player, role }) => position(player, role)));
-    await Promise.all(moves.map(async ({ page: player, key }) => {
+    await Promise.all(moves.map(async ({ page: player, key, durationMs }) => {
       await player.keyboard.down(key);
-      await player.waitForTimeout(350);
+      await player.waitForTimeout(durationMs);
       await player.keyboard.up(key);
     }));
     const after = await Promise.all(moves.map(async ({ page: player, role }, index) => {
-      await expect.poll(async () => position(player, role)).not.toEqual(before[index]);
-      return position(player, role);
+      return waitForMovementToFinish(player, role, before[index]!);
     }));
     for (let index = 0; index < moves.length; index += 1) {
       for (const observer of players) {
-        await expect.poll(async () => position(observer, moves[index]!.role)).toEqual(after[index]);
+        await expect.poll(async () => position(observer, moves[index]!.role), {
+          timeout: 30_000,
+        }).toEqual(after[index]);
       }
     }
 
@@ -138,7 +143,10 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await test.step("complete the real custom recipe through authoritative actions", async () => {
       await completeCustomRecipe(blind, players);
     });
-    await Promise.all(players.map((player) => expect(player.locator("[data-round-status]")).toHaveText("Won")));
+    await Promise.all(players.map((player) => expect(player.locator("[data-round-status]")).toHaveText("Won", { timeout: 20_000 })));
+
+    await Promise.allSettled(contexts.splice(0).map((context) => context.close()));
+    await page.close();
 
     const rollbackContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     contexts.push(rollbackContext);
@@ -148,6 +156,7 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     await rollback.goto("/?renderer=phaser");
     await rollback.locator(".join-panel [name=displayName]").fill("Rollback Cook");
     await rollback.locator('[data-action="create"]').click();
+    await pickFirstCharacter(rollback);
     await expect(rollback.locator('[data-kitchen-world][data-renderer="phaser"]'))
       .toHaveAttribute("data-renderer-state", "ready", { timeout: 45_000 });
     await expect(rollback.locator('[data-kitchen-world][data-renderer="phaser"] canvas')).toHaveCount(1);
@@ -172,6 +181,7 @@ async function guest(
   page.setDefaultTimeout(15_000);
   watchErrors(page);
   await page.goto(`/?${new URLSearchParams({ room: roomId, player })}`);
+  await pickFirstCharacter(page);
   return page;
 }
 
@@ -181,6 +191,21 @@ async function position(page: Page, role: string): Promise<PlayerPosition> {
     x: Number(await marker.getAttribute("data-world-x")),
     z: Number(await marker.getAttribute("data-world-z")),
   };
+}
+
+async function waitForMovementToFinish(
+  page: Page,
+  role: string,
+  before: PlayerPosition,
+): Promise<PlayerPosition> {
+  const marker = page.locator(`[data-kitchen-avatar="${role}"]`);
+  await expect.poll(async () => position(page, role), {
+    timeout: 30_000,
+  }).not.toEqual(before);
+  await expect(marker).toHaveAttribute("data-locomotion", "IDLE", {
+    timeout: 30_000,
+  });
+  return position(page, role);
 }
 
 async function waitForCameraToSettle(page: Page): Promise<void> {
@@ -212,6 +237,7 @@ async function completeCustomRecipe(blind: Page, players: readonly Page[]): Prom
     const id = await candidate.getAttribute("data-object-id");
     expect(id).toBeTruthy();
     ids.push(id!);
+
     await selectObject(blind, id!);
     await blind.locator(`[data-object-id="${id}"] [data-pick-up]`).dispatchEvent("click");
     await expect(blind.locator(`[data-object-id="${id}"]`)).toContainText("Held by you");

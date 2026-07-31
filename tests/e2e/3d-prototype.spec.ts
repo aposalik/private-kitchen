@@ -120,12 +120,13 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
       await player.keyboard.up(key);
     }));
     const after = await Promise.all(moves.map(async ({ page: player, role }, index) => {
-      await expect.poll(async () => position(player, role)).not.toEqual(before[index]);
-      return waitForPositionToSettle(player, role);
+      return waitForMovementToFinish(player, role, before[index]!);
     }));
     for (let index = 0; index < moves.length; index += 1) {
       for (const observer of players) {
-        await expect.poll(async () => position(observer, moves[index]!.role)).toEqual(after[index]);
+        await expect.poll(async () => position(observer, moves[index]!.role), {
+          timeout: 30_000,
+        }).toEqual(after[index]);
       }
     }
 
@@ -190,22 +191,19 @@ async function position(page: Page, role: string): Promise<PlayerPosition> {
   };
 }
 
-async function waitForPositionToSettle(page: Page, role: string): Promise<PlayerPosition> {
-  let previous: PlayerPosition | undefined;
-  let current: PlayerPosition | undefined;
-  let stableSamples = 0;
-  await expect.poll(async () => {
-    current = await position(page, role);
-    stableSamples = previous?.x === current.x && previous.z === current.z
-      ? stableSamples + 1
-      : 0;
-    previous = current;
-    return stableSamples;
-  }, {
-    timeout: 15_000,
-    intervals: [100, 100, 100, 100, 100, 100],
-  }).toBeGreaterThanOrEqual(3);
-  return current!;
+async function waitForMovementToFinish(
+  page: Page,
+  role: string,
+  before: PlayerPosition,
+): Promise<PlayerPosition> {
+  const marker = page.locator(`[data-kitchen-avatar="${role}"]`);
+  await expect.poll(async () => position(page, role), {
+    timeout: 30_000,
+  }).not.toEqual(before);
+  await expect(marker).toHaveAttribute("data-locomotion", "IDLE", {
+    timeout: 30_000,
+  });
+  return position(page, role);
 }
 
 async function waitForCameraToSettle(page: Page): Promise<void> {

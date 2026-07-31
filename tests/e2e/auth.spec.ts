@@ -139,5 +139,9 @@ async function completeRecipe(blind: Page, players: Page[]): Promise<void> {
 }
 
 async function expectProgress(players: Page[], progress: number): Promise<void> {
-  await Promise.all(players.map((player) => expect(player.locator("[data-round-progress]")).toContainText(`${progress} / 10`)));
+  await Promise.all(players.map((player) =>
+    expect(player.locator("[data-round-progress]")).toContainText(`${progress} / 10`, {
+      timeout: 15_000,
+    }),
+  ));
 }

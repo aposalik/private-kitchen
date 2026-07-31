@@ -113,7 +113,10 @@ async function helper(
   roomId: string,
   playerName: string,
 ): Promise<Page> {
-  const context = await browser.newContext({ baseURL });
+  const context = await browser.newContext({
+    baseURL,
+    viewport: { width: 844, height: 390 },
+  });
   contexts.push(context);
   const page = await context.newPage();
   const query = new URLSearchParams({ room: roomId, player: playerName });

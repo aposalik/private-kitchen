@@ -109,19 +109,19 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
     )));
 
     const moves = [
-      { page: blind, role: "BLIND_COOK", key: "s" },
-      { page: recipeKeeper, role: "RECIPE_KEEPER", key: "a" },
-      { page: deafGuide, role: "DEAF_KITCHEN_GUIDE", key: "d" },
+      { page: blind, role: "BLIND_COOK", key: "s", durationMs: 100 },
+      { page: recipeKeeper, role: "RECIPE_KEEPER", key: "a", durationMs: 350 },
+      { page: deafGuide, role: "DEAF_KITCHEN_GUIDE", key: "d", durationMs: 350 },
     ] as const;
     const before = await Promise.all(moves.map(({ page: player, role }) => position(player, role)));
-    await Promise.all(moves.map(async ({ page: player, key }) => {
+    await Promise.all(moves.map(async ({ page: player, key, durationMs }) => {
       await player.keyboard.down(key);
-      await player.waitForTimeout(350);
+      await player.waitForTimeout(durationMs);
       await player.keyboard.up(key);
     }));
     const after = await Promise.all(moves.map(async ({ page: player, role }, index) => {
       await expect.poll(async () => position(player, role)).not.toEqual(before[index]);
-      return position(player, role);
+      return waitForPositionToSettle(player, role);
     }));
     for (let index = 0; index < moves.length; index += 1) {
       for (const observer of players) {
@@ -141,6 +141,9 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
       await completeCustomRecipe(blind, players);
     });
     await Promise.all(players.map((player) => expect(player.locator("[data-round-status]")).toHaveText("Won")));
+
+    await Promise.allSettled(contexts.splice(0).map((context) => context.close()));
+    await page.close();
 
     const rollbackContext = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     contexts.push(rollbackContext);
@@ -185,6 +188,24 @@ async function position(page: Page, role: string): Promise<PlayerPosition> {
     x: Number(await marker.getAttribute("data-world-x")),
     z: Number(await marker.getAttribute("data-world-z")),
   };
+}
+
+async function waitForPositionToSettle(page: Page, role: string): Promise<PlayerPosition> {
+  let previous: PlayerPosition | undefined;
+  let current: PlayerPosition | undefined;
+  let stableSamples = 0;
+  await expect.poll(async () => {
+    current = await position(page, role);
+    stableSamples = previous?.x === current.x && previous.z === current.z
+      ? stableSamples + 1
+      : 0;
+    previous = current;
+    return stableSamples;
+  }, {
+    timeout: 15_000,
+    intervals: [100, 100, 100, 100, 100, 100],
+  }).toBeGreaterThanOrEqual(3);
+  return current!;
 }
 
 async function waitForCameraToSettle(page: Page): Promise<void> {

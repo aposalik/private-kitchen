@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@babylonjs/core": "^9.18.0",
+    "@babylonjs/loaders": "^9.18.0",
     "@colyseus/sdk": "^0.17.43",
     "@cooking-game/shared": "0.1.0",
     "livekit-client": "^2.20.2",

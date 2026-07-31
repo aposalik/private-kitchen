@@ -1,4 +1,5 @@
 import {
+  AnimationGroup,
   ArcRotateCamera,
   Color3,
   Color4,
@@ -9,11 +10,13 @@ import {
   Mesh,
   MeshBuilder,
   Scene,
+  SceneLoader,
   ShadowGenerator,
   StandardMaterial,
   TransformNode,
   Vector3,
 } from "@babylonjs/core";
+import '@babylonjs/loaders/glTF';
 import {
   KITCHEN_LAYOUT,
   ROLE_LABELS,
@@ -53,12 +56,17 @@ export const PHASE_C_LIGHTING = {
 
 interface CharacterNodes {
   readonly root: TransformNode;
-  readonly body: Mesh;
-  readonly leftArm: Mesh;
-  readonly rightArm: Mesh;
+  /** null when character is a loaded glTF (animation handled via animGroups) */
+  readonly body: Mesh | null;
+  /** null when character is a loaded glTF */
+  readonly leftArm: Mesh | null;
+  /** null when character is a loaded glTF */
+  readonly rightArm: Mesh | null;
   readonly heldAnchor: TransformNode;
   role: PlayerRole;
   animation: CharacterAnimationState;
+  /** glTF animation groups keyed by name; empty map for procedural characters */
+  readonly animGroups: ReadonlyMap<string, AnimationGroup>;
 }
 
 export function createBabylonKitchenRuntime(
@@ -74,6 +82,8 @@ export function createBabylonKitchenRuntime(
   scene.clearColor = Color4.FromHexString("#2b2025ff");
   scene.ambientColor = Color3.FromHexString("#fff1d1");
   const presenters = new Map<string, CharacterNodes>();
+  /** Player IDs whose glTF character is currently being loaded */
+  const loadingCharacters = new Set<string>();
   const ingredients = new Map<string, Mesh>();
   const interpolator = new RemoteSnapshotInterpolator();
   const occluders: Mesh[] = [];
@@ -106,6 +116,8 @@ export function createBabylonKitchenRuntime(
 
   buildLighting(scene);
   buildKitchen(scene, occluders);
+  // Kick off async glTF environment loading; procedural kitchen stays visible as fallback
+  void buildKitchenGltf(scene);
 
   const update = (next: LobbySnapshot): void => {
     snapshot = next;
@@ -116,15 +128,31 @@ export function createBabylonKitchenRuntime(
     interpolator.removeExcept(active);
     for (const player of players) {
       let presenter = presenters.get(player.id);
-      if (!presenter) {
-        presenter = createCharacter(
-          scene,
-          player,
-          player.id === next.sessionId,
-          options.reducedMotion,
-        );
-        presenters.set(player.id, presenter);
+      if (!presenter && !loadingCharacters.has(player.id)) {
+        loadingCharacters.add(player.id);
+        const isLocal = player.id === next.sessionId;
+        const characterId = isLocal
+          ? String((window as any).__selectedCharacter ?? 'Rabbit_Blond')
+          : 'Rabbit_Blond';
+        loadCharacter(scene, player, characterId, isLocal, options.reducedMotion)
+          .then((nodes) => {
+            loadingCharacters.delete(player.id);
+            if (!active.has(player.id)) {
+              nodes.root.dispose(false, true);
+              return;
+            }
+            presenters.set(player.id, nodes);
+          })
+          .catch(() => {
+            loadingCharacters.delete(player.id);
+            if (!active.has(player.id)) return;
+            const fallback = createProceduralCharacter(
+              scene, player, player.id === next.sessionId, options.reducedMotion,
+            );
+            presenters.set(player.id, fallback);
+          });
       }
+      if (!presenter) continue; // still loading
       if (presenter.role !== player.role) continue;
       interpolator.push(player.id, player, now);
       const transform = player.id === next.sessionId
@@ -137,6 +165,9 @@ export function createBabylonKitchenRuntime(
       if (active.has(id)) continue;
       presenter.root.dispose(false, true);
       presenters.delete(id);
+    }
+    for (const id of loadingCharacters) {
+      if (!active.has(id)) loadingCharacters.delete(id);
     }
   };
 
@@ -347,7 +378,187 @@ function addStationProp(scene: Scene, id: string, x: number, z: number): void {
   }
 }
 
-function createCharacter(
+/**
+ * Load a single glTF environment piece and position it in the scene.
+ * Silently ignores errors so a missing asset never crashes the kitchen.
+ */
+async function loadEnvironmentPiece(
+  scene: Scene,
+  modelName: string,
+  position: Vector3,
+  rotation?: Vector3,
+  scaleFactor = 1,
+): Promise<void> {
+  try {
+    const result = await SceneLoader.ImportMeshAsync(
+      '', `/assets/3d/sushi/environment/`, `${modelName}.gltf`, scene,
+    );
+    const root = new TransformNode(`env_${modelName}_${position.x}_${position.z}`, scene);
+    for (const mesh of result.meshes) {
+      if (mesh.parent === null) mesh.parent = root;
+    }
+    root.position = position;
+    if (rotation) root.rotation = rotation;
+    if (scaleFactor !== 1) root.scaling.setAll(scaleFactor);
+  } catch {
+    // asset unavailable — procedural mesh already covers this area
+  }
+}
+
+/**
+ * Async overlay: load glTF kitchen models on top of the procedural kitchen.
+ * Each piece is placed to match the KITCHEN_LAYOUT station positions.
+ * If any individual asset fails, that slot keeps its procedural mesh.
+ */
+async function buildKitchenGltf(scene: Scene): Promise<void> {
+  const stationMap: Record<string, string> = {
+    INGREDIENT_STORAGE: 'Environment_Cabinet_Shelves',
+    PREPARATION:        'Environment_CuttingTable',
+    STOVE:              'Environment_Oven',
+    SERVING_PASS:       'Environment_Counter_Straight',
+    RECIPE_LECTERN:     'Environment_Table',
+    GESTURE_STATION:    'Environment_Cabinet_Shelves_2',
+  };
+
+  const loads: Promise<void>[] = [];
+
+  for (const [id, station] of Object.entries(KITCHEN_LAYOUT.stations)) {
+    const modelName = stationMap[id];
+    if (!modelName) continue;
+    loads.push(loadEnvironmentPiece(
+      scene,
+      modelName,
+      new Vector3(station.x, 0, station.z + 4),
+      undefined,
+      3,
+    ));
+  }
+
+  // Add a pot on the stove
+  const stove = KITCHEN_LAYOUT.stations['STOVE'];
+  if (stove) {
+    loads.push(loadEnvironmentPiece(
+      scene,
+      'Environment_Pot_1_Empty',
+      new Vector3(stove.x, 5, stove.z + 4),
+      undefined,
+      3,
+    ));
+  }
+
+  // Floor tiles (sample a few)
+  for (let x = 5; x < 95; x += 20) {
+    for (let z = 5; z < 55; z += 20) {
+      loads.push(loadEnvironmentPiece(
+        scene,
+        'Floor_Tiles',
+        new Vector3(x, 0, z),
+        undefined,
+        3,
+      ));
+    }
+  }
+
+  // A wall segment at the back
+  for (let x = 5; x < 100; x += 15) {
+    loads.push(loadEnvironmentPiece(
+      scene,
+      'Wall_Normal',
+      new Vector3(x, 0, 60),
+      undefined,
+      3,
+    ));
+  }
+
+  await Promise.allSettled(loads);
+}
+
+/**
+ * Load a glTF character model. Falls back to procedural on any error.
+ * Returns a CharacterNodes with animGroups populated from the glTF file.
+ */
+async function loadCharacter(
+  scene: Scene,
+  player: LobbyPlayerSnapshot,
+  characterId: string,
+  local: boolean,
+  reducedMotion: boolean,
+): Promise<CharacterNodes> {
+  try {
+    const result = await SceneLoader.ImportMeshAsync(
+      '', `/assets/3d/sushi/characters/`, `${characterId}.gltf`, scene,
+    );
+    const root = new TransformNode(`player-${player.id}`, scene);
+    root.position.set(player.x, 0, player.z);
+    root.rotation.y = player.facingYaw;
+    // Re-parent all top-level meshes under our root
+    for (const mesh of result.meshes) {
+      if (mesh.parent === null) mesh.parent = root;
+    }
+    // Scale the model to match the procedural character's world-unit size (~10 units tall)
+    root.scaling.setAll(4);
+
+    const heldAnchor = new TransformNode(`held-${player.id}`, scene);
+    heldAnchor.parent = root;
+    heldAnchor.position.set(0, 1.1, 0.6); // relative to scaled root
+
+    const playerName = player.displayName?.trim() || "Teammate";
+    addMarker(
+      scene,
+      root,
+      `${playerName} • ${ROLE_LABELS[player.role]}${local ? " • YOU" : ""}`,
+      local,
+    );
+
+    const animGroups = new Map<string, AnimationGroup>();
+    for (const group of result.animationGroups) {
+      animGroups.set(group.name, group);
+      group.stop();
+    }
+    // Start idle by default
+    const idleAnim = animGroups.get('Idle') ?? animGroups.get('idle');
+    idleAnim?.start(true);
+
+    return {
+      root,
+      body: null,
+      leftArm: null,
+      rightArm: null,
+      heldAnchor,
+      role: player.role,
+      animation: player.locomotion === "MOVE" ? "MOVE" : "IDLE",
+      animGroups,
+    };
+  } catch {
+    // glTF failed — fall through to procedural
+    return createProceduralCharacter(scene, player, local, reducedMotion);
+  }
+}
+
+/**
+ * Switch glTF animation groups based on CharacterAnimationState.
+ * Only switches when the state actually changes (caller responsibility).
+ */
+function switchGltfAnimation(presenter: CharacterNodes, state: CharacterAnimationState): void {
+  const groups = presenter.animGroups;
+  const stopAll = (): void => { for (const g of groups.values()) g.stop(); };
+  stopAll();
+  const ANIM_MAP: Partial<Record<CharacterAnimationState, readonly string[]>> = {
+    IDLE:  ['Idle', 'idle', 'IDLE'],
+    MOVE:  ['Walk', 'walk', 'Run', 'run'],
+    CARRY: ['Walk_Holding', 'Idle_Holding', 'Walk', 'Idle'],
+  };
+  const candidates = ANIM_MAP[state] ?? ['Idle'];
+  for (const name of candidates) {
+    const group = groups.get(name);
+    if (group) { group.start(true); return; }
+  }
+  // If nothing matched, just play whatever is first
+  const first = groups.values().next().value as AnimationGroup | undefined;
+  first?.start(true);
+}
+
+function createProceduralCharacter(
   scene: Scene,
   player: LobbyPlayerSnapshot,
   local: boolean,
@@ -415,6 +626,7 @@ function createCharacter(
     heldAnchor,
     role: player.role,
     animation: player.locomotion === "MOVE" ? "MOVE" : "IDLE",
+    animGroups: new Map<string, AnimationGroup>(),
   };
 }
 
@@ -509,15 +721,26 @@ function applyCharacterTransform(
   presenter.root.position.x = transform.x;
   presenter.root.position.z = transform.z;
   presenter.root.rotation.y = transform.facingYaw;
+  const prevAnimation = presenter.animation;
   presenter.animation = player.locomotion === "MOVE"
     ? "MOVE"
     : presenter.heldAnchor.getChildren().length > 0
       ? "CARRY"
       : "IDLE";
+
+  // glTF characters use animation groups
+  if (presenter.animGroups.size > 0) {
+    if (presenter.animation !== prevAnimation) {
+      switchGltfAnimation(presenter, presenter.animation);
+    }
+    return;
+  }
+
+  // Procedural characters use direct mesh transforms
   if (reducedMotion) return;
   const stride = presenter.animation === "MOVE" ? Math.sin(now / 110) * 0.55 : 0;
-  presenter.leftArm.rotation.x = stride;
-  presenter.rightArm.rotation.x = -stride;
+  if (presenter.leftArm) presenter.leftArm.rotation.x = stride;
+  if (presenter.rightArm) presenter.rightArm.rotation.x = -stride;
 }
 
 function syncHeldIngredient(
@@ -617,7 +840,10 @@ function animateIdle(
 ): void {
   let index = 0;
   for (const presenter of presenters.values()) {
-    if (presenter.animation === "IDLE" || presenter.animation === "CARRY") {
+    // glTF characters animate via animation groups; skip procedural body bob
+    if (presenter.animGroups.size === 0
+      && presenter.body !== null
+      && (presenter.animation === "IDLE" || presenter.animation === "CARRY")) {
       presenter.body.position.y = 3.4 + Math.sin(now / 620 + index) * 0.08;
     }
     index += 1;

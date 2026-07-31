@@ -10,6 +10,9 @@ import { PLAYTEST_FEEDBACK_KEY } from "../src/playtest/PlaytestFeedback.js";
 import type { PrivateRecipePayload, VoiceRelayEnvelope } from "@cooking-game/shared";
 import { Lobby } from "../src/ui/Lobby.js";
 
+const quickPickCharacter = (): Promise<{ characterId: string }> =>
+  Promise.resolve({ characterId: "Rabbit_Blond" });
+
 describe("Lobby", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
@@ -35,7 +38,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     await vi.waitFor(() =>
       expect(actionButtons(root).every((button) => button.disabled)).toBe(false),
     );
@@ -54,7 +57,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    const lobby = new Lobby(root, connection);
+    const lobby = new Lobby(root, connection, { pickCharacter: quickPickCharacter });
     lobby.mount();
 
     lobby.restoreDisplayName("Saved Cook");
@@ -68,7 +71,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     root.querySelector<HTMLElement>("[data-auth-root]")!.innerHTML = `
       <input name="displayName" value="Account Field" />
       <p class="error" role="alert"></p>`;
@@ -86,7 +89,7 @@ describe("Lobby", () => {
     const root = document.createElement("main");
     document.body.replaceChildren(root);
 
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     await vi.waitFor(() =>
       expect(connection.join).toHaveBeenCalledWith("INVITE123", "Invited Player"),
@@ -100,7 +103,7 @@ describe("Lobby", () => {
     const root = document.createElement("main");
     document.body.replaceChildren(root);
 
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     expect(connection.resume).not.toHaveBeenCalled();
     expect(connection.join).not.toHaveBeenCalled();
@@ -116,7 +119,7 @@ describe("Lobby", () => {
     connection.resume.mockImplementation(() => resume.promise);
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     expect(actionButtons(root).every((button) => button.disabled)).toBe(true);
 
@@ -134,7 +137,7 @@ describe("Lobby", () => {
       connection.create.mockImplementation(() => attempt.promise);
       const root = document.createElement("main");
       document.body.replaceChildren(root);
-      new Lobby(root, connection).mount();
+      new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
       await vi.waitFor(() => expect(connection.resume).toHaveBeenCalled());
 
       const name = root.querySelector<HTMLInputElement>("[name=displayName]")!;
@@ -155,7 +158,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     await vi.waitFor(() =>
       expect(actionButtons(root).every((button) => button.disabled)).toBe(false),
     );
@@ -183,7 +186,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     const player = {
       id: "blind-session",
@@ -230,7 +233,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     expect(root.dataset.connectionState).toBe("DISCONNECTED");
     expect(root.dataset.roundPhase).toBe("WAITING");
@@ -267,7 +270,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     connection.emit({
       connectionStatus: roundStatus === "PAUSED" ? "RECONNECTING" : "CONNECTED",
@@ -291,7 +294,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     connection.emit({
       connectionStatus: "CONNECTED",
       role: "DEAF_KITCHEN_GUIDE",
@@ -311,7 +314,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     const round = root.querySelector<HTMLElement>("[data-round-section]")!;
     expect(round).not.toBeNull();
@@ -338,7 +341,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     const base = {
       connectionStatus: "CONNECTED" as const,
       roomId: "room",
@@ -368,7 +371,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     connection.emit({
       connectionStatus: "CONNECTED",
@@ -389,7 +392,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     connection.emit({
       connectionStatus: "CONNECTED",
@@ -419,7 +422,7 @@ describe("Lobby", () => {
       const connection = new FakeConnection();
       const root = document.createElement("main");
       document.body.replaceChildren(root);
-      new Lobby(root, connection).mount();
+      new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
       connection.emit({
         connectionStatus: "CONNECTED",
@@ -437,7 +440,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     connection.emit({ connectionStatus: "CONNECTED", role: "RECIPE_KEEPER" });
 
@@ -451,7 +454,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     connection.emit({
       connectionStatus: "CONNECTED",
@@ -497,7 +500,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     connection.emit({
       connectionStatus: "CONNECTED",
       role: "BLIND_COOK",
@@ -522,7 +525,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     connection.emit({
       connectionStatus: "CONNECTED",
       role: "BLIND_COOK",
@@ -558,7 +561,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     const cases = [
       [6, "SEASON"],
       [7, "BOIL"],
@@ -613,7 +616,7 @@ describe("Lobby", () => {
       const connection = new FakeConnection();
       const root = document.createElement("main");
       document.body.replaceChildren(root);
-      new Lobby(root, connection).mount();
+      new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
       connection.emit({
         connectionStatus: "CONNECTED",
         role: "BLIND_COOK",
@@ -635,7 +638,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     connection.emit({
       connectionStatus: "CONNECTED",
       role: "BLIND_COOK",
@@ -654,7 +657,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     connection.emit({
       connectionStatus: "CONNECTED",
       role: "BLIND_COOK",
@@ -681,7 +684,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     connection.emit({
       connectionStatus: "CONNECTED",
       role: "BLIND_COOK",
@@ -708,6 +711,7 @@ describe("Lobby", () => {
     const root = document.createElement("main");
     document.body.replaceChildren(root);
     new Lobby(root, connection, {
+      pickCharacter: quickPickCharacter,
       storage: localStorage,
       monotonicNow: () => now,
       exportFeedback: () => undefined,
@@ -781,6 +785,7 @@ describe("Lobby", () => {
     const root = document.createElement("main");
     document.body.replaceChildren(root);
     new Lobby(root, connection, {
+      pickCharacter: quickPickCharacter,
       storage: localStorage,
       monotonicNow: () => now,
       exportFeedback: () => undefined,
@@ -822,7 +827,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     connection.emit({
       connectionStatus: "CONNECTED",
@@ -847,7 +852,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     connection.emit({
       connectionStatus: "CONNECTED",
@@ -871,7 +876,7 @@ describe("Lobby", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");
     document.body.replaceChildren(root);
-    new Lobby(root, connection).mount();
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
     connection.emit({
       connectionStatus: "CONNECTED",
       roomId: "ROOM123",

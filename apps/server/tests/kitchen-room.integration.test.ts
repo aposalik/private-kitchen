@@ -140,6 +140,7 @@ describe("KitchenRoom capacity", () => {
     await waitForState(observer, (state) => state.connectedCount === 3);
 
     const dropped = rooms[2]!;
+    await waitForState(dropped, (state) => state.players.get(dropped.sessionId) !== undefined);
     const releasedRole = dropped.state.players.get(dropped.sessionId)!.role;
     dropped.reconnection.enabled = false;
     dropped.connection.close();

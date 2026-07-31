@@ -6,6 +6,7 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 const ROLE_LABELS = ["Blind Cook", "Recipe Keeper", "Deaf Kitchen Guide"];
 const ROLE_KEYS: Readonly<Record<string, string>> = {
@@ -23,8 +24,9 @@ test("three isolated players communicate under exact role policy and a fourth is
     await host.goto("/");
     await host.locator(".join-panel [name=displayName]").fill("Player One");
     await host.locator("[data-action=create]").click();
+    await pickFirstCharacter(host);
     const roomField = host.locator('[data-field="room"]');
-    await expect(roomField).not.toHaveText("—");
+    await expect(roomField).not.toHaveText("—", { timeout: 30_000 });
     const roomId = (await roomField.textContent())!.trim();
 
     const second = await newPlayerPage(browser, contexts);
@@ -282,6 +284,7 @@ async function newPlayerPage(browser: Browser, contexts: BrowserContext[]): Prom
 async function autoJoin(page: Page, roomId: string, player: string): Promise<void> {
   const query = new URLSearchParams({ room: roomId, player });
   await page.goto(`/?${query.toString()}`);
+  await pickFirstCharacter(page);
 }
 
 async function expectCountFor(locator: Locator, count: number, durationMs = 300): Promise<void> {

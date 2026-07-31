@@ -6,8 +6,10 @@ import { pathToFileURL } from "node:url";
 import {
   DEFAULT_RECONNECTION_GRACE_SECONDS,
   KITCHEN_ROOM_NAME,
+  MATCHMAKING_ROOM_NAME,
 } from "@cooking-game/shared";
 import { KitchenRoom } from "./rooms/KitchenRoom.js";
+import { MatchmakingRoom } from "./rooms/MatchmakingRoom.js";
 import { createDatabaseClient, ensureDatabaseSchema } from "./db/client.js";
 import { PrismaRepository } from "./db/repository.js";
 import { createKitchenHttpApp } from "./http/app.js";
@@ -109,6 +111,9 @@ export async function startKitchenServer(
       return (await repository.consumePrivateTestToken(selection.token, now()))?.document;
     },
   });
+
+  gameServer.define(MATCHMAKING_ROOM_NAME, MatchmakingRoom);
+
   try {
     await gameServer.listen(options.port ?? 2567, hostname);
   } catch (error) {

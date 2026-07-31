@@ -2,6 +2,7 @@ export * from "./actions.js";
 export * from "./communication.js";
 export * from "./game-state.js";
 export * from "./kitchen-layout.js";
+export * from "./matchmaking.js";
 export * from "./movement.js";
 export * from "./protocol.js";
 export * from "./randomization.js";

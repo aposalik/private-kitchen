@@ -1,4 +1,5 @@
 import { type AuthContext, type Client, ErrorCode, Room, ServerError } from "@colyseus/core";
+import { consumeTicket } from "./ticketStore.js";
 import { defineTypes, MapSchema, Schema } from "@colyseus/schema";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -35,11 +36,18 @@ import { RecipeSystem } from "../systems/recipe-system.js";
 import { MovementSystem } from "../systems/movement-system.js";
 import type { NewGameHistory } from "../db/repository.js";
 
+const VALID_CHARACTER_IDS = [
+  'Panda', 'Rabbit_Bald', 'Rabbit_Blond', 'Rabbit_Cyan',
+  'Rabbit_Green', 'Rabbit_Grey', 'Rabbit_Pink', 'Rabbit_Purple',
+] as const;
+
 const joinOptionsSchema = z
   .object({
     displayName: z.string().trim().min(1).max(32),
+    characterId: z.enum(VALID_CHARACTER_IDS).optional(),
     recipeId: z.string().min(1).max(64).optional(),
     recipeTestToken: z.string().min(20).max(128).optional(),
+    matchmakingTicket: z.string().min(8).max(64).optional(),
   })
   .strict()
   .refine((value) => !(value.recipeId && value.recipeTestToken));
@@ -51,6 +59,7 @@ const dropPayloadSchema = z.object({ objectId: objectIdSchema }).strict();
 class KitchenPlayer extends Schema {
   id = "";
   displayName = "";
+  characterId = "Rabbit_Blond";
   role: PlayerRole = "BLIND_COOK";
   connected = true;
   x = 0;
@@ -63,6 +72,7 @@ class KitchenPlayer extends Schema {
 defineTypes(KitchenPlayer, {
   id: "string",
   displayName: "string",
+  characterId: "string",
   role: "string",
   connected: "boolean",
   x: "float64",
@@ -269,16 +279,33 @@ export class KitchenRoom extends Room {
       );
     }
 
-    const options: KitchenJoinOptions = { displayName: parsedOptions.data.displayName };
-    const role = this.nextAvailableRole();
+    const options: KitchenJoinOptions = {
+      displayName: parsedOptions.data.displayName,
+      ...(parsedOptions.data.characterId !== undefined ? { characterId: parsedOptions.data.characterId } : {}),
+    };
+    const ticketRole = parsedOptions.data.matchmakingTicket
+      ? consumeTicket(parsedOptions.data.matchmakingTicket)
+      : undefined;
+    const role = ticketRole ?? this.nextAvailableRole();
 
     if (!role) {
       throw new Error("Room capacity reached");
     }
 
+    // If a ticket specified a role already taken (duplicate join), reject.
+    if (ticketRole) {
+      const assigned = new Set(
+        Array.from(this.state.players.values(), (p) => p.role),
+      );
+      if (assigned.has(ticketRole)) {
+        throw new ServerError(ErrorCode.APPLICATION_ERROR, "Seat already taken");
+      }
+    }
+
     const player = new KitchenPlayer();
     player.id = client.sessionId;
     player.displayName = options.displayName;
+    player.characterId = parsedOptions.data.characterId ?? 'Rabbit_Blond';
     player.role = role;
     const spawn = KITCHEN_LAYOUT.roleSpawns[role];
     player.x = spawn.x;

@@ -85,6 +85,7 @@ export interface LobbySnapshot {
 export interface LobbyPlayerSnapshot {
   readonly id: string;
   readonly displayName?: string;
+  readonly characterId?: string;
   readonly role: PlayerRole;
   readonly connected: boolean;
   readonly x: number;
@@ -109,9 +110,10 @@ export interface LobbyObjectSnapshot {
 export interface LobbyConnection {
   create(
     displayName: string,
-    selection?: { recipeId?: string; recipeTestToken?: string },
+    selection?: { characterId?: string; recipeId?: string; recipeTestToken?: string },
   ): Promise<void>;
-  join(roomId: string, displayName: string): Promise<void>;
+  join(roomId: string, displayName: string, characterId?: string): Promise<void>;
+  joinWithTicket(roomId: string, displayName: string, characterId: string, ticket: string): Promise<void>;
   resume(): Promise<boolean>;
   move(axisX: number, axisZ: number): number | undefined;
   pickUp(objectId: string): void;
@@ -160,7 +162,7 @@ export interface RoomClientTransport {
   ): Promise<RoomClientRoom>;
   joinById(
     roomId: string,
-    options: { displayName: string },
+    options: KitchenJoinOptions,
   ): Promise<RoomClientRoom>;
   reconnect(token: string): Promise<RoomClientRoom>;
 }
@@ -221,16 +223,22 @@ export class RoomClient implements LobbyConnection {
 
   create(
     displayName: string,
-    selection: { recipeId?: string; recipeTestToken?: string } = {},
+    selection: { characterId?: string; recipeId?: string; recipeTestToken?: string } = {},
   ): Promise<void> {
     return this.startConnection(() =>
       this.transport.create(KITCHEN_ROOM_NAME, { displayName, ...selection }),
     );
   }
 
-  join(roomId: string, displayName: string): Promise<void> {
+  join(roomId: string, displayName: string, characterId?: string): Promise<void> {
     return this.startConnection(() =>
-      this.transport.joinById(roomId.trim(), { displayName }),
+      this.transport.joinById(roomId.trim(), { displayName, ...(characterId ? { characterId } : {}) }),
+    );
+  }
+
+  joinWithTicket(roomId: string, displayName: string, characterId: string, ticket: string): Promise<void> {
+    return this.startConnection(() =>
+      this.transport.joinById(roomId.trim(), { displayName, characterId, matchmakingTicket: ticket }),
     );
   }
 
@@ -546,6 +554,7 @@ export class RoomClient implements LobbyConnection {
         players: Array.from(state.players.values(), (current) => ({
           id: current.id,
           displayName: current.displayName,
+          characterId: (current as any).characterId,
           role: current.role,
           connected: current.connected,
           x: current.x,

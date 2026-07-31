@@ -49,7 +49,7 @@ describe("Lobby", () => {
     root.querySelector<HTMLInputElement>(".join-panel [name=displayName]")!.value = "Player One";
     root.querySelector<HTMLButtonElement>("[data-action=create]")!.click();
 
-    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One"));
+    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One", expect.any(Object)));
     expect(root.querySelector<HTMLElement>("[data-auth-root] .error")!.textContent).toBe("Account error");
   });
 
@@ -79,7 +79,7 @@ describe("Lobby", () => {
     await vi.waitFor(() => expect(root.querySelector<HTMLButtonElement>("[data-action=create]")!.disabled).toBe(false));
     root.querySelector<HTMLButtonElement>("[data-action=create]")!.click();
 
-    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Guest Cook"));
+    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Guest Cook", expect.any(Object)));
     expect(root.querySelector<HTMLElement>("[data-auth-root] .error")!.textContent).toBe("");
   });
 
@@ -92,7 +92,7 @@ describe("Lobby", () => {
     new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     await vi.waitFor(() =>
-      expect(connection.join).toHaveBeenCalledWith("INVITE123", "Invited Player"),
+      expect(connection.join).toHaveBeenCalledWith("INVITE123", "Invited Player", expect.any(String)),
     );
     expect(connection.resume).not.toHaveBeenCalled();
   });
@@ -166,7 +166,7 @@ describe("Lobby", () => {
     const name = root.querySelector<HTMLInputElement>("[name=displayName]")!;
     name.value = "Player One";
     root.querySelector<HTMLButtonElement>("[data-action=create]")!.click();
-    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One"));
+    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One", expect.any(Object)));
 
     connection.emit({
       connectionStatus: "CONNECTED",
@@ -898,6 +898,7 @@ describe("Lobby", () => {
 class FakeConnection implements LobbyConnection {
   create = vi.fn(async (_displayName: string) => undefined);
   join = vi.fn(async (_roomId: string, _displayName: string) => undefined);
+  joinWithTicket = vi.fn(async (_roomId: string, _displayName: string, _characterId: string, _ticket: string) => undefined);
   resume = vi.fn(async () => false);
   move = vi.fn((_axisX: number, _axisZ: number) => 1);
   pickUp = vi.fn((_objectId: string) => undefined);

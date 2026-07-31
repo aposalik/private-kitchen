@@ -26,6 +26,12 @@ const reportSchema = z.strictObject({
   reason: z.enum(["HATE_OR_HARASSMENT", "SEXUAL_CONTENT", "VIOLENCE", "SPAM", "COPYRIGHT", "OTHER"]),
   details: z.string().trim().min(10).max(500),
 });
+const playerReportSchema = z.strictObject({
+  reportedDisplayName: z.string().trim().min(1).max(32),
+  roomId: z.string().trim().min(1).max(64),
+  reason: z.enum(["HATE_OR_HARASSMENT", "SPAM", "OTHER"]),
+  details: z.string().trim().min(10).max(500),
+});
 const moderationReasonSchema = z.strictObject({ reason: z.string().trim().min(3).max(500) });
 const emptyBodySchema = z.strictObject({});
 
@@ -329,6 +335,23 @@ export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
     if (!id || !emptyBodySchema.safeParse(request.body).success || !await options.repository.restoreRemovedRecipe(id)) {
       return sendError(response, 404, "NOT_FOUND", "Recipe not found.");
     }
+    response.status(204).end();
+  }));
+
+  // Player abuse reports (sent from in-game report button)
+  app.post("/api/players/reports", authenticate(sessions), asyncHandler(async (request, response) => {
+    if (!consumeRecipeAttempt(recipeLimiters.report, request, response.locals.account.id, "player-report")) {
+      return sendError(response, 429, "TOO_MANY_ATTEMPTS", "Too many reports. Try again later.");
+    }
+    const body = playerReportSchema.safeParse(request.body);
+    if (!body.success) return sendError(response, 400, "INVALID_REQUEST", "Invalid report.");
+    // Stored for moderation review — no automated action.
+    await options.repository.createRecipeReport({
+      recipeId: `player:${body.data.reportedDisplayName}:${body.data.roomId}`,
+      reporterAccountId: response.locals.account.id,
+      reason: body.data.reason,
+      details: body.data.details,
+    });
     response.status(204).end();
   }));
 

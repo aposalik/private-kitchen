@@ -27,6 +27,7 @@ import {
   type RoleBriefingPhase,
 } from "./RoleBriefing.js";
 import { CharacterSelect } from "./CharacterSelect.js";
+import { MatchmakingLobby } from "./MatchmakingLobby.js";
 
 export interface LobbyOptions {
   readonly storage?: Storage;
@@ -95,9 +96,11 @@ export class Lobby {
           <label for="room-id">Invite code</label>
           <input id="room-id" name="roomId" autocomplete="off" spellcheck="false" placeholder="Room ID" />
           <div class="actions">
+            <button type="button" data-action="quick-match">Quick Match</button>
             <button type="button" data-action="create">Create private room</button>
             <button type="button" class="secondary" data-action="join">Join room</button>
           </div>
+          <div data-matchmaking-root hidden></div>
           <p data-selected-recipe role="status">Recipe: bundled kitchen recipe</p>
           <p class="error" role="alert" hidden></p>
         </div>
@@ -184,6 +187,8 @@ export class Lobby {
     new CommunicationPanel(this.root.querySelector<HTMLElement>("[data-communication-root]")!, this.connection).mount();
     this.createButton.addEventListener("click", () => void this.connect("create"));
     this.joinButton.addEventListener("click", () => void this.connect("join"));
+    this.root.querySelector<HTMLButtonElement>("[data-action=quick-match]")!
+      .addEventListener("click", () => this.openMatchmaking());
     this.root.querySelector<HTMLButtonElement>("[data-resume-game]")!
       .addEventListener("click", () => this.togglePauseOverlay(false));
 
@@ -246,6 +251,43 @@ export class Lobby {
     alert.hidden = false;
   };
 
+  private openMatchmaking(): void {
+    const displayName = this.nameInput.value.trim();
+    if (!displayName) {
+      this.showError("Enter your name before joining Quick Match.");
+      return;
+    }
+    const mmRoot = this.root.querySelector<HTMLElement>("[data-matchmaking-root]")!;
+    const joinPanel = this.root.querySelector<HTMLElement>(".join-panel")!;
+    joinPanel.hidden = true;
+    mmRoot.hidden = false;
+
+    const endpoint = (() => {
+      if (import.meta.env.VITE_SERVER_URL) return import.meta.env.VITE_SERVER_URL as string;
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      return `${protocol}://${location.hostname}:2567`;
+    })();
+
+    const characterId = (this.root.querySelector<HTMLInputElement>("[data-character-id]")?.value) ?? "Rabbit_Blond";
+
+    const mm = new MatchmakingLobby(mmRoot, {
+      endpoint,
+      displayName,
+      characterId,
+      onMatch: ({ roomId, ticket, displayName: dn, characterId: cid }) => {
+        mmRoot.hidden = true;
+        joinPanel.hidden = false;
+        void this.connection.joinWithTicket(roomId, dn, cid, ticket);
+      },
+      onCancel: () => {
+        mmRoot.hidden = true;
+        joinPanel.hidden = false;
+        mm.unmount();
+      },
+    });
+    mm.mount();
+  }
+
   private async connect(action: "create" | "join"): Promise<void> {
     const displayName = this.nameInput.value.trim();
     const roomId = this.roomInput.value.trim();
@@ -263,12 +305,12 @@ export class Lobby {
     try {
       if (action === "create") {
         if (this.selectedRecipe) {
-          await this.connection.create(displayName, this.selectedRecipe);
+          await this.connection.create(displayName, { characterId, ...this.selectedRecipe });
         } else {
-          await this.connection.create(displayName);
+          await this.connection.create(displayName, { characterId });
         }
       } else {
-        await this.connection.join(roomId, displayName);
+        await this.connection.join(roomId, displayName, characterId);
       }
     } catch {
       this.showError("Unable to connect. Check the room ID and try again.");
@@ -790,6 +832,7 @@ export class Lobby {
   private setDisabled(disabled: boolean): void {
     this.createButton.disabled = disabled;
     this.joinButton.disabled = disabled;
+    this.quickMatchButton.disabled = disabled;
   }
 
   private updateActionAvailability(): void {
@@ -816,6 +859,10 @@ export class Lobby {
 
   private get joinButton(): HTMLButtonElement {
     return this.root.querySelector<HTMLButtonElement>("[data-action=join]")!;
+  }
+
+  private get quickMatchButton(): HTMLButtonElement {
+    return this.root.querySelector<HTMLButtonElement>("[data-action=quick-match]")!;
   }
 }
 

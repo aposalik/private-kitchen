@@ -26,6 +26,7 @@ import {
   renderRoleBriefing,
   type RoleBriefingPhase,
 } from "./RoleBriefing.js";
+import { CharacterSelect } from "./CharacterSelect.js";
 
 export interface LobbyOptions {
   readonly storage?: Storage;
@@ -33,6 +34,8 @@ export interface LobbyOptions {
   readonly exportFeedback?: (json: string) => void;
   readonly world?: KitchenWorldAdapter;
   readonly input?: PlayerInputController;
+  /** Override character selection for tests; defaults to showing CharacterSelect UI. */
+  readonly pickCharacter?: () => Promise<{ characterId: string }>;
 }
 
 export class Lobby {
@@ -56,6 +59,8 @@ export class Lobby {
   private unsubscribe: (() => void) | undefined;
   private selectedRecipe: { recipeId?: string; recipeTestToken?: string } | undefined;
 
+  private readonly pickCharacter: () => Promise<{ characterId: string }>;
+
   constructor(
     private readonly root: HTMLElement,
     private readonly connection: LobbyConnection,
@@ -70,6 +75,8 @@ export class Lobby {
       interact: () => this.activateContextualAction(),
       pause: () => this.togglePauseOverlay(),
     });
+    this.pickCharacter = options.pickCharacter ??
+      (() => new CharacterSelect(this.root).show());
   }
 
   mount(): void {
@@ -249,6 +256,10 @@ export class Lobby {
 
     this.showError();
     this.setDisabled(true);
+
+    const { characterId } = await this.pickCharacter();
+    (window as any).__selectedCharacter = characterId;
+
     try {
       if (action === "create") {
         if (this.selectedRecipe) {

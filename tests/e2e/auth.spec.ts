@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 test.use({ trace: "off" });
 
@@ -49,7 +50,8 @@ test("account persists, owns data and history, signs out, while guests still joi
   await expect(page.locator("[data-selected-recipe]")).toContainText("private test");
 
   await page.locator('[data-action="create"]').click();
-  await expect(page.locator('[data-field="room"]')).not.toHaveText("—");
+  await pickFirstCharacter(page);
+  await expect(page.locator('[data-field="room"]')).not.toHaveText("—", { timeout: 30_000 });
   const roomId = (await page.locator('[data-field="room"]').textContent())!.trim();
   expect(roomId).not.toBe("—");
   const guestContexts: BrowserContext[] = [];
@@ -63,6 +65,7 @@ test("account persists, owns data and history, signs out, while guests still joi
     await completeRecipe(blind, players);
     await expect(page.locator("[data-round-status]")).toHaveText("Won");
 
+    await Promise.allSettled(guestContexts.splice(0).map((context) => context.close()));
     await page.reload();
     await expect(page.locator("[data-authenticated-account]")).toHaveText("Saved Cook", { timeout: 30_000 });
     await expect(page.locator("[data-history]")).toContainText("WON", { timeout: 30_000 });
@@ -101,6 +104,7 @@ async function guest(browser: Browser, contexts: BrowserContext[], roomId: strin
   contexts.push(context);
   const page = await context.newPage();
   await page.goto(`/?${new URLSearchParams({ room: roomId, player })}`);
+  await pickFirstCharacter(page);
   return page;
 }
 
@@ -136,5 +140,9 @@ async function completeRecipe(blind: Page, players: Page[]): Promise<void> {
 }
 
 async function expectProgress(players: Page[], progress: number): Promise<void> {
-  await Promise.all(players.map((player) => expect(player.locator("[data-round-progress]")).toContainText(`${progress} / 10`)));
+  await Promise.all(players.map((player) =>
+    expect(player.locator("[data-round-progress]")).toContainText(`${progress} / 10`, {
+      timeout: 15_000,
+    }),
+  ));
 }

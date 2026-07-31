@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 test("browser engine loads production assets and preserves authoritative identity after reload", async ({ browser, baseURL }) => {
   let context: BrowserContext | undefined;
@@ -15,9 +16,10 @@ test("browser engine loads production assets and preserves authoritative identit
     await expect(page.locator("[data-action=create]")).toBeEnabled();
     await page.locator(".join-panel [name=displayName]").fill("Engine Smoke");
     await page.locator("[data-action=create]").click();
+    await pickFirstCharacter(page);
     const room = page.locator('[data-field="room"]');
     const role = page.locator('[data-field="role"]');
-    await expect(room).not.toHaveText("—");
+    await expect(room).not.toHaveText("—", { timeout: 30_000 });
     const roomId = (await room.textContent())!.trim();
     const roleName = (await role.textContent())!.trim();
 

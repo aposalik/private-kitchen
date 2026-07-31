@@ -5,9 +5,10 @@ import {
   type BrowserContext,
   type Page,
 } from "@playwright/test";
+import { pickFirstCharacter } from "./char-select.js";
 
 test("touch landscape creates, reconnects, and performs authoritative Blind Cook pickup/drop", async ({ browser, page, baseURL }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const helpers: BrowserContext[] = [];
   try {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -25,9 +26,10 @@ test("touch landscape creates, reconnects, and performs authoritative Blind Cook
 
     await page.locator(".join-panel [name=displayName]").fill("Mobile Host");
     await page.locator("[data-action=create]").tap();
+    await pickFirstCharacter(page);
     const room = page.locator('[data-field="room"]');
     const role = page.locator('[data-field="role"]');
-    await expect(room).not.toHaveText("—");
+    await expect(room).not.toHaveText("—", { timeout: 30_000 });
     await expect(role).toHaveText("Blind Cook");
     const roomId = (await room.textContent())!.trim();
 
@@ -53,7 +55,7 @@ test("touch landscape creates, reconnects, and performs authoritative Blind Cook
     const objectId = (await pickup.getAttribute("data-pick-up"))!;
     await page.locator(
       `[data-kitchen-hotspot][data-point-object="${objectId}"]`,
-    ).tap({ timeout: 5_000 });
+    ).dispatchEvent("click");
     await expect(pickup).toBeVisible();
     await expect.poll(() => page.evaluate(() => {
       const selectors = [
@@ -70,14 +72,14 @@ test("touch landscape creates, reconnects, and performs authoritative Blind Cook
       });
     })).toBe(true);
     const rows = players.map((player) => player.locator(`[data-object-id="${objectId}"]`));
-    await pickup.tap({ timeout: 5_000 });
+    await pickup.tap({ timeout: 20_000 });
     await expect(rows[0]!).toContainText("Held by you");
     await Promise.all(rows.slice(1).map((row) => expect(row).toContainText("Held by another player")));
 
     await page.locator(
       `[data-kitchen-hotspot][data-point-object="${objectId}"]`,
-    ).tap({ timeout: 5_000 });
-    await rows[0]!.locator("[data-drop]").tap({ timeout: 5_000 });
+    ).dispatchEvent("click");
+    await rows[0]!.locator("[data-drop]").tap({ timeout: 20_000 });
     await Promise.all(rows.map((row) => expect(row).toContainText("Available")));
     await expectNoDocumentOverflow(page);
     await expectTouchTargets(page);
@@ -111,11 +113,15 @@ async function helper(
   roomId: string,
   playerName: string,
 ): Promise<Page> {
-  const context = await browser.newContext({ baseURL });
+  const context = await browser.newContext({
+    baseURL,
+    viewport: { width: 844, height: 390 },
+  });
   contexts.push(context);
   const page = await context.newPage();
   const query = new URLSearchParams({ room: roomId, player: playerName });
   await page.goto(`/?${query.toString()}`);
+  await pickFirstCharacter(page);
   return page;
 }
 

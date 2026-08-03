@@ -67,7 +67,7 @@ export function contextualPrompt(
   if (nearest === "INGREDIENT_STORAGE") {
     return prompt("PICK_UP", "Pick up ingredient");
   }
-  return context.hasHeldIngredient ? prompt("PLACE", "Place ingredient") : undefined;
+  return context.hasHeldIngredient ? prompt("PLACE", "Place ingredient") : prompt("PICK_UP", "Pick up ingredient");
 }
 
 function distanceSquared(

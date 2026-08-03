@@ -20,6 +20,7 @@ import '@babylonjs/loaders/glTF';
 import {
   KITCHEN_LAYOUT,
   ROLE_LABELS,
+  type KitchenObjectKind,
   type PlayerRole,
 } from "@cooking-game/shared";
 
@@ -41,6 +42,48 @@ import {
   LocalPrediction,
   type MotionTransform,
 } from "./SnapshotMotion.js";
+
+const INGREDIENT_FILE_MAP: Partial<Record<KitchenObjectKind, string>> = {
+  TOMATO:     "FoodIngredient_Tomato.glb",
+  POTATO:     "FoodIngredient_Potato.glb",
+  CARROT:     "FoodIngredient_Carrot.glb",
+  ONION:      "FoodIngredient_Onion.glb",
+  APPLE:      "FoodIngredient_Apple.glb",
+  CABBAGE:    "FoodIngredient_Cabbage.glb",
+  CUCUMBER:   "FoodIngredient_Cucumber.glb",
+  EGG:        "FoodIngredient_Egg.glb",
+  EGGPLANT:   "FoodIngredient_Eggplant.glb",
+  AVOCADO:    "FoodIngredient_Avocado.gltf",
+  CRABSTICKS: "FoodIngredient_Crabsticks.gltf",
+  EBI:        "FoodIngredient_Ebi.gltf",
+  FISH:       "FoodIngredient_Fish.gltf",
+  NORI:       "FoodIngredient_Nori.gltf",
+  OCTOPUS:    "FoodIngredient_Octopus.gltf",
+  RICE:       "FoodIngredient_Rice.gltf",
+  SALMON:     "FoodIngredient_Salmon.gltf",
+  TUNA:       "FoodIngredient_Tuna.gltf",
+};
+
+const INGREDIENT_FALLBACK_COLORS: Partial<Record<KitchenObjectKind, string>> = {
+  TOMATO:     "#e85148",
+  ONION:      "#ead6a6",
+  CARROT:     "#f28a3a",
+  POTATO:     "#b98a59",
+  APPLE:      "#d94f3d",
+  CABBAGE:    "#6db56d",
+  CUCUMBER:   "#5aab5a",
+  EGG:        "#f5e6c8",
+  EGGPLANT:   "#6a3f7a",
+  AVOCADO:    "#7ac76a",
+  CRABSTICKS: "#e8a88a",
+  EBI:        "#f0a070",
+  FISH:       "#8ab8d8",
+  NORI:       "#2a3a2a",
+  OCTOPUS:    "#d07090",
+  RICE:       "#f5f0e0",
+  SALMON:     "#fa8072",
+  TUNA:       "#c04060",
+};
 
 const ROLE_COLORS: Readonly<Record<PlayerRole, string>> = {
   BLIND_COOK: "#e57946",
@@ -79,11 +122,13 @@ export function createBabylonKitchenRuntime(
     stencil: true,
   });
   const scene = new Scene(engine);
-  scene.clearColor = Color4.FromHexString("#2b2025ff");
+  scene.clearColor = Color4.FromHexString("#c9d8e8ff");
   scene.ambientColor = Color3.FromHexString("#fff1d1");
   const presenters = new Map<string, CharacterNodes>();
   /** Player IDs whose glTF character is currently being loaded */
   const loadingCharacters = new Set<string>();
+  /** Ingredient IDs whose glTF model is currently being loaded */
+  const loadingIngredients = new Set<string>();
   const ingredients = new Map<string, Mesh>();
   const interpolator = new RemoteSnapshotInterpolator();
   const occluders: Mesh[] = [];
@@ -93,6 +138,7 @@ export function createBabylonKitchenRuntime(
   let cameraState = cameraGoal([], undefined);
   let lastFrameAt = performance.now();
   let firstRenderResolved = false;
+  let lastFeedLength = 0;
   let resolveFirstRender!: () => void;
   const firstRender = new Promise<void>((resolve) => {
     resolveFirstRender = resolve;
@@ -123,7 +169,7 @@ export function createBabylonKitchenRuntime(
     snapshot = next;
     const now = performance.now();
     const players = next.players ?? [];
-    syncWorldIngredients(scene, ingredients, next);
+    syncWorldIngredients(scene, ingredients, loadingIngredients, next);
     const active = new Set(players.map(({ id }) => id));
     interpolator.removeExcept(active);
     for (const player of players) {
@@ -133,7 +179,7 @@ export function createBabylonKitchenRuntime(
         const isLocal = player.id === next.sessionId;
         const characterId = isLocal
           ? String((window as any).__selectedCharacter ?? 'Rabbit_Blond')
-          : 'Rabbit_Blond';
+          : (player.characterId ?? 'Rabbit_Blond');
         loadCharacter(scene, player, characterId, isLocal, options.reducedMotion)
           .then((nodes) => {
             loadingCharacters.delete(player.id);
@@ -169,6 +215,25 @@ export function createBabylonKitchenRuntime(
     for (const id of loadingCharacters) {
       if (!active.has(id)) loadingCharacters.delete(id);
     }
+
+    // Issue 3: trigger arm-wave animation on RECIPE_KEEPER when new GESTURE events arrive
+    const feed = next.communicationFeed ?? [];
+    if (feed.length > lastFeedLength) {
+      const newEvents = feed.slice(lastFeedLength);
+      const hasGesture = newEvents.some(
+        (e) => e.kind === "GESTURE" && e.senderRole === "RECIPE_KEEPER",
+      );
+      if (hasGesture && !options.reducedMotion) {
+        const keeperPlayer = players.find((p) => p.role === "RECIPE_KEEPER");
+        if (keeperPlayer) {
+          const keeper = presenters.get(keeperPlayer.id);
+          if (keeper) {
+            triggerGestureAnimation(keeper);
+          }
+        }
+      }
+    }
+    lastFeedLength = feed.length;
   };
 
   scene.onBeforeRenderObservable.add(() => {
@@ -278,48 +343,30 @@ function buildLighting(scene: Scene): void {
 }
 
 function buildKitchen(scene: Scene, occluders: Mesh[]): void {
-  const floor = MeshBuilder.CreateGround("warm-checker-floor", {
+  // Invisible ground plane — catches shadows and keeps characters grounded
+  // while the GLB room provides the visible floor/walls/ceiling.
+  const floor = MeshBuilder.CreateGround("shadow-floor", {
     width: 104,
     height: 64,
     subdivisions: 2,
   }, scene);
   floor.position.set(50, 0, 30);
-  floor.material = pbr(scene, "painted-floor", "#d8b58e", 0.88, 0.02);
   floor.receiveShadows = true;
+  floor.isVisible = false;
 
-  for (let x = 5; x < 100; x += 10) {
-    for (let z = 5; z < 60; z += 10) {
-      if ((x / 10 + z / 10) % 2 < 1) continue;
-      const tile = MeshBuilder.CreateBox(`tile-${x}-${z}`, {
-        width: 9.6,
-        depth: 9.6,
-        height: 0.08,
-      }, scene);
-      tile.position.set(x, 0.04, z);
-      tile.material = pbr(scene, `tile-material-${x}-${z}`, "#edc5b4", 0.94, 0);
-    }
-  }
-
-  const backWall = roundedBox(scene, "back-wall", 104, 11, 1, "#f3cfaa");
-  backWall.position.set(50, 5.5, 60.5);
-  const leftWall = roundedBox(scene, "left-wall", 1, 11, 62, "#efc5a4");
-  leftWall.position.set(-0.5, 5.5, 30);
+  // Invisible front rail kept in occluders so the camera-occlusion logic still works.
   const frontRail = roundedBox(scene, "front-occluder", 104, 3.5, 1.2, "#bf765a");
   frontRail.position.set(50, 1.75, -0.6);
+  frontRail.isVisible = false;
   occluders.push(frontRail);
 
   for (const [id, station] of Object.entries(KITCHEN_LAYOUT.stations)) {
-    const colors: Record<string, string> = {
-      INGREDIENT_STORAGE: "#e9a36f",
-      PREPARATION: "#64b6a9",
-      STOVE: "#d96d55",
-      SERVING_PASS: "#f2d391",
-      RECIPE_LECTERN: "#79aebd",
-      GESTURE_STATION: "#9bc879",
-    };
-    const counter = roundedBox(scene, `station-${id}`, 12, 4.8, 7, colors[id] ?? "#d99c73");
+    // Invisible anchor boxes — the GLTF props loaded by buildKitchenGltf()
+    // sit on top of these; keeping them ensures lighting / shadow receivers exist.
+    const counter = roundedBox(scene, `station-${id}`, 12, 4.8, 7, "#ffffff");
     counter.position.set(station.x, 2.4, station.z + 4);
     counter.receiveShadows = true;
+    counter.isVisible = false;
     addStationProp(scene, id, station.x, station.z);
   }
 
@@ -330,13 +377,14 @@ function buildKitchen(scene: Scene, occluders: Mesh[]): void {
       collider.maxX - collider.minX,
       5.5,
       collider.maxZ - collider.minZ,
-      "#c9855e",
+      "#ffffff",
     );
     cabinet.position.set(
       (collider.minX + collider.maxX) / 2,
       2.75,
       (collider.minZ + collider.maxZ) / 2,
     );
+    cabinet.isVisible = false;
   }
 }
 
@@ -379,98 +427,127 @@ function addStationProp(scene: Scene, id: string, x: number, z: number): void {
 }
 
 /**
- * Load a single glTF environment piece and position it in the scene.
- * Silently ignores errors so a missing asset never crashes the kitchen.
+ * Load a single environment piece (glTF or glb) and position it in the scene.
+ * Pass the full filename including extension. Silently ignores errors so a
+ * missing asset never crashes the kitchen.
  */
 async function loadEnvironmentPiece(
   scene: Scene,
-  modelName: string,
+  fileName: string,
   position: Vector3,
   rotation?: Vector3,
   scaleFactor = 1,
 ): Promise<void> {
   try {
     const result = await SceneLoader.ImportMeshAsync(
-      '', `/assets/3d/sushi/environment/`, `${modelName}.gltf`, scene,
+      '', `/assets/3d/sushi/environment/`, fileName, scene,
     );
-    const root = new TransformNode(`env_${modelName}_${position.x}_${position.z}`, scene);
+    const root = new TransformNode(`env_${fileName}_${position.x}_${position.z}`, scene);
     for (const mesh of result.meshes) {
       if (mesh.parent === null) mesh.parent = root;
     }
     root.position = position;
     if (rotation) root.rotation = rotation;
     if (scaleFactor !== 1) root.scaling.setAll(scaleFactor);
-  } catch {
+  } catch (err) {
+    console.error(`[env] Failed to load ${fileName}:`, err);
     // asset unavailable — procedural mesh already covers this area
   }
 }
 
 /**
- * Async overlay: load glTF kitchen models on top of the procedural kitchen.
- * Each piece is placed to match the KITCHEN_LAYOUT station positions.
+ * Async overlay: load glTF/glb kitchen models on top of the procedural kitchen.
  * If any individual asset fails, that slot keeps its procedural mesh.
  */
 async function buildKitchenGltf(scene: Scene): Promise<void> {
-  const stationMap: Record<string, string> = {
-    INGREDIENT_STORAGE: 'Environment_Cabinet_Shelves',
-    PREPARATION:        'Environment_CuttingTable',
-    STOVE:              'Environment_Oven',
-    SERVING_PASS:       'Environment_Counter_Straight',
-    RECIPE_LECTERN:     'Environment_Table',
-    GESTURE_STATION:    'Environment_Cabinet_Shelves_2',
-  };
-
   const loads: Promise<void>[] = [];
 
+  // Base room — provides walls, floor, ceiling
+  loads.push(loadEnvironmentPiece(
+    scene,
+    'Environment_KitchenRoom.glb',
+    new Vector3(50, 0, 30),
+    new Vector3(0, Math.PI, 0),
+    65,
+  ));
+
+  const stationMap: Record<string, string> = {
+    INGREDIENT_STORAGE: 'Environment_Cabinet_Shelves.gltf',
+    PREPARATION:        'Environment_CuttingTable.gltf',
+    STOVE:              'Environment_Stove.glb',
+    SERVING_PASS:       'Environment_Counter_Straight.gltf',
+    RECIPE_LECTERN:     'Environment_Table.gltf',
+    GESTURE_STATION:    'Environment_Cabinets.glb',
+  };
+
   for (const [id, station] of Object.entries(KITCHEN_LAYOUT.stations)) {
-    const modelName = stationMap[id];
-    if (!modelName) continue;
+    const fileName = stationMap[id];
+    if (!fileName) continue;
     loads.push(loadEnvironmentPiece(
       scene,
-      modelName,
+      fileName,
       new Vector3(station.x, 0, station.z + 4),
       undefined,
       3,
     ));
   }
 
-  // Add a pot on the stove
+  // Cooking pot on the stove
   const stove = KITCHEN_LAYOUT.stations['STOVE'];
   if (stove) {
     loads.push(loadEnvironmentPiece(
       scene,
-      'Environment_Pot_1_Empty',
+      'Environment_Pot_1_Empty.gltf',
       new Vector3(stove.x, 5, stove.z + 4),
       undefined,
       3,
     ));
   }
 
-  // Floor tiles (sample a few)
-  for (let x = 5; x < 95; x += 20) {
-    for (let z = 5; z < 55; z += 20) {
-      loads.push(loadEnvironmentPiece(
-        scene,
-        'Floor_Tiles',
-        new Vector3(x, 0, z),
-        undefined,
-        3,
-      ));
-    }
-  }
-
-  // A wall segment at the back
-  for (let x = 5; x < 100; x += 15) {
-    loads.push(loadEnvironmentPiece(
-      scene,
-      'Wall_Normal',
-      new Vector3(x, 0, 60),
-      undefined,
-      3,
-    ));
-  }
-
   await Promise.allSettled(loads);
+}
+
+/**
+ * Async load a food ingredient GLB and swap it in place of the procedural
+ * placeholder already stored in `ingredients`. Silently keeps the placeholder
+ * on any error.
+ */
+async function loadIngredientGltf(
+  scene: Scene,
+  id: string,
+  kind: KitchenObjectKind,
+  ingredients: Map<string, Mesh>,
+  loadingIngredients: Set<string>,
+): Promise<void> {
+  const fileName = INGREDIENT_FILE_MAP[kind];
+  if (!fileName) {
+    loadingIngredients.delete(id);
+    return;
+  }
+  try {
+    const result = await SceneLoader.ImportMeshAsync(
+      '', `/assets/3d/sushi/food/`, fileName, scene,
+    );
+    const anchor = ingredients.get(id);
+    if (!anchor) {
+      // ingredient was removed while loading — discard result
+      for (const mesh of result.meshes) mesh.dispose();
+      loadingIngredients.delete(id);
+      return;
+    }
+    // Hide procedural placeholder; parent glTF under it so it inherits position/scale
+    anchor.isVisible = false;
+    const gltfRoot = new TransformNode(`ingredient-gltf-${id}`, scene);
+    gltfRoot.parent = anchor;
+    gltfRoot.scaling.setAll(2);
+    for (const mesh of result.meshes) {
+      if (mesh.parent === null) mesh.parent = gltfRoot;
+    }
+  } catch {
+    // keep the procedural placeholder
+  } finally {
+    loadingIngredients.delete(id);
+  }
 }
 
 /**
@@ -556,6 +633,41 @@ function switchGltfAnimation(presenter: CharacterNodes, state: CharacterAnimatio
   // If nothing matched, just play whatever is first
   const first = groups.values().next().value as AnimationGroup | undefined;
   first?.start(true);
+}
+
+/**
+ * Play a one-shot wave/gesture animation on the RECIPE_KEEPER's character.
+ * Tries known gesture animation names from the glTF; falls back to waving the
+ * right arm of a procedural character by keying it up and back down.
+ */
+function triggerGestureAnimation(presenter: CharacterNodes): void {
+  const groups = presenter.animGroups;
+  if (groups.size > 0) {
+    // Try common gesture animation names from character GLTFs
+    const candidates = ['Wave', 'wave', 'Gesture', 'gesture', 'HandWave', 'ArmWave'];
+    for (const name of candidates) {
+      const group = groups.get(name);
+      if (group) {
+        group.start(false);
+        return;
+      }
+    }
+  }
+  // Procedural fallback: quickly raise and lower the right arm
+  const arm = presenter.rightArm;
+  if (!arm) return;
+  const startRotX = arm.rotation.x;
+  const peak = -Math.PI / 2.2;
+  const DURATION = 1_400;
+  const startAt = performance.now();
+  const tick = (): void => {
+    const t = Math.min(1, (performance.now() - startAt) / DURATION);
+    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    arm.rotation.x = startRotX + (peak - startRotX) * ease * (1 - t);
+    if (t < 1) requestAnimationFrame(tick);
+    else arm.rotation.x = startRotX;
+  };
+  requestAnimationFrame(tick);
 }
 
 function createProceduralCharacter(
@@ -757,24 +869,20 @@ function syncHeldIngredient(
   }
   if (children[0]?.metadata?.objectId === held.id) return;
   for (const child of children) child.dispose();
-  const colors = {
-    TOMATO: "#e85148",
-    ONION: "#ead6a6",
-    CARROT: "#f28a3a",
-    POTATO: "#b98a59",
-  } as const;
+  const color = INGREDIENT_FALLBACK_COLORS[held.kind] ?? "#c8a86a";
   const ingredient = MeshBuilder.CreateSphere(`held-ingredient-${held.id}`, {
     diameter: 1.7,
     segments: 18,
   }, scene);
   ingredient.parent = presenter.heldAnchor;
-  ingredient.material = pbr(scene, `ingredient-${held.id}`, colors[held.kind], 0.55, 0.02);
+  ingredient.material = pbr(scene, `ingredient-${held.id}`, color, 0.55, 0.02);
   ingredient.metadata = { objectId: held.id };
 }
 
 function syncWorldIngredients(
   scene: Scene,
   ingredients: Map<string, Mesh>,
+  loadingIngredients: Set<string>,
   snapshot: LobbySnapshot,
 ): void {
   const visible = new Set(
@@ -784,6 +892,7 @@ function syncWorldIngredients(
   );
   for (const [id, mesh] of ingredients) {
     if (visible.has(id)) continue;
+    mesh.getChildMeshes(false).forEach((c) => c.dispose());
     mesh.dispose();
     ingredients.delete(id);
   }
@@ -793,6 +902,10 @@ function syncWorldIngredients(
     if (!ingredient) {
       ingredient = createIngredientMesh(scene, object.id, object.kind);
       ingredients.set(object.id, ingredient);
+      if (!loadingIngredients.has(object.id)) {
+        loadingIngredients.add(object.id);
+        void loadIngredientGltf(scene, object.id, object.kind, ingredients, loadingIngredients);
+      }
     }
     const target = object.location === "POT"
       ? KITCHEN_LAYOUT.stations.STOVE
@@ -803,7 +916,11 @@ function syncWorldIngredients(
       target.z + (object.location === "POT" ? 4 : 0),
     );
     ingredient.scaling.y = object.preparation === "CHOPPED" ? 0.55 : 1;
-    ingredient.visibility = object.preparation === "RUINED" ? 0.62 : 1;
+    const vis = object.preparation === "RUINED" ? 0.62 : 1;
+    ingredient.visibility = vis;
+    for (const child of ingredient.getChildMeshes(false)) {
+      child.visibility = vis;
+    }
   }
 }
 
@@ -812,24 +929,21 @@ function createIngredientMesh(
   id: string,
   kind: LobbyObjectSnapshot["kind"],
 ): Mesh {
-  const colors = {
-    TOMATO: "#e85148",
-    ONION: "#ead6a6",
-    CARROT: "#f28a3a",
-    POTATO: "#b98a59",
-  } as const;
-  const mesh = kind === "CARROT"
+  const color = INGREDIENT_FALLBACK_COLORS[kind] ?? "#c8a86a";
+  const elongated = kind === "CARROT" || kind === "NORI" || kind === "TUNA";
+  const large = kind === "POTATO" || kind === "CABBAGE" || kind === "OCTOPUS" || kind === "SALMON";
+  const mesh = elongated
     ? MeshBuilder.CreateCapsule(`ingredient-${id}`, {
         height: 2.7,
         radius: 0.72,
         tessellation: 18,
       }, scene)
     : MeshBuilder.CreateSphere(`ingredient-${id}`, {
-        diameter: kind === "POTATO" ? 2.15 : 1.9,
+        diameter: large ? 2.15 : 1.9,
         segments: 18,
       }, scene);
-  if (kind === "CARROT") mesh.rotation.z = Math.PI / 2;
-  mesh.material = pbr(scene, `ingredient-material-${id}`, colors[kind], 0.55, 0.02);
+  if (elongated) mesh.rotation.z = Math.PI / 2;
+  mesh.material = pbr(scene, `ingredient-material-${id}`, color, 0.55, 0.02);
   mesh.metadata = { objectId: id, kind };
   return mesh;
 }

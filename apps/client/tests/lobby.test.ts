@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 
 import type {
   LobbyConnection,
@@ -15,7 +15,12 @@ const quickPickCharacter = (): Promise<{ characterId: string }> =>
 
 describe("Lobby", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     window.history.replaceState({}, "", "/");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   test("stylesheet encodes the mobile viewport, safe-area, touch target, focus, canvas, wrapping, and motion contract", () => {
@@ -893,6 +898,150 @@ describe("Lobby", () => {
     expect(connection.pointAtLocation).toHaveBeenCalledWith(50, 30);
     expect(root.querySelectorAll('input[type="number"], [data-point-controls] input')).toHaveLength(0);
   });
+
+  test("WON result screen shows a Return to menu button that calls leave and restores setup surface", async () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      roomId: "ROOM1",
+      sessionId: "self",
+      role: "BLIND_COOK",
+      connectedCount: 3,
+      roomStatus: "READY",
+      roundStatus: "WON",
+      completedStepCount: 6,
+      totalStepCount: 6,
+    });
+
+    const returnBtn = root.querySelector<HTMLButtonElement>("[data-action=return-to-menu]");
+    expect(returnBtn).not.toBeNull();
+
+    connection.leave.mockImplementation(async () => {
+      connection.emit({ connectionStatus: "DISCONNECTED" });
+    });
+    returnBtn!.click();
+
+    await vi.waitFor(() =>
+      expect(root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden).toBe(false),
+    );
+    expect(connection.leave).toHaveBeenCalled();
+  });
+
+  test("LOST result screen shows a Play again button that calls leave and restores setup surface", async () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      roomId: "ROOM1",
+      sessionId: "self",
+      role: "RECIPE_KEEPER",
+      connectedCount: 3,
+      roomStatus: "READY",
+      roundStatus: "LOST",
+      outcomeReason: "TIME_EXPIRED",
+      completedStepCount: 2,
+      totalStepCount: 6,
+    });
+
+    const playAgainBtn = root.querySelector<HTMLButtonElement>("[data-action=play-again]");
+    expect(playAgainBtn).not.toBeNull();
+
+    connection.leave.mockImplementation(async () => {
+      connection.emit({ connectionStatus: "DISCONNECTED" });
+    });
+    playAgainBtn!.click();
+
+    await vi.waitFor(() =>
+      expect(root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden).toBe(false),
+    );
+    expect(connection.leave).toHaveBeenCalled();
+  });
+
+  test("countdown overlay fires when round transitions NOT_STARTED to RUNNING and hides after 3s", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "NOT_STARTED" });
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(true);
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 180_000 });
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>("[data-countdown-digit]")!.textContent).toBe("3");
+
+    vi.advanceTimersByTime(3000);
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(true);
+  });
+
+  test("prominent reconnection banner appears during RECONNECTING and hides when CONNECTED", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 120_000 });
+    expect(root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden).toBe(true);
+
+    connection.emit({ connectionStatus: "RECONNECTING", role: "BLIND_COOK", connectedCount: 2, roomStatus: "READY", roundStatus: "PAUSED" });
+    expect(root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden).toBe(false);
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 100_000 });
+    expect(root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden).toBe(true);
+  });
+
+  test("role introduction gate appears once when role is first assigned and hides after acknowledgement", async () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 1, roomStatus: "WAITING" });
+
+    const gate = root.querySelector<HTMLElement>("[data-role-intro-gate]");
+    expect(gate).not.toBeNull();
+    expect(gate!.hidden).toBe(false);
+    expect(gate!.textContent).toContain("Blind Cook");
+
+    const ackBtn = gate!.querySelector<HTMLButtonElement>("[data-action=acknowledge-role]");
+    expect(ackBtn).not.toBeNull();
+    ackBtn!.click();
+
+    expect(gate!.hidden).toBe(true);
+  });
+
+  test("role introduction gate does not reappear after the same role on subsequent snapshots", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "RECIPE_KEEPER", connectedCount: 1, roomStatus: "WAITING" });
+    root.querySelector<HTMLButtonElement>("[data-action=acknowledge-role]")!.click();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "RECIPE_KEEPER", connectedCount: 2, roomStatus: "WAITING" });
+    expect(root.querySelector<HTMLElement>("[data-role-intro-gate]")!.hidden).toBe(true);
+  });
+
+  test("countdown does not fire when reconnecting from PAUSED to RUNNING", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 120_000 });
+    vi.advanceTimersByTime(3000);
+    connection.emit({ connectionStatus: "RECONNECTING", role: "BLIND_COOK", connectedCount: 2, roomStatus: "READY", roundStatus: "PAUSED" });
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 100_000 });
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(true);
+  });
 });
 
 class FakeConnection implements LobbyConnection {
@@ -917,6 +1066,7 @@ class FakeConnection implements LobbyConnection {
   sendDrawingStroke = vi.fn();
   clearDrawing = vi.fn();
   sendVoiceSignal = vi.fn();
+  leave = vi.fn(async () => undefined);
   private listeners = new Set<(snapshot: LobbySnapshot) => void>();
 
   subscribe(listener: (snapshot: LobbySnapshot) => void): () => void {
@@ -935,7 +1085,7 @@ class FakeConnection implements LobbyConnection {
 }
 
 function actionButtons(root: HTMLElement): HTMLButtonElement[] {
-  return Array.from(root.querySelectorAll<HTMLButtonElement>("[data-action]"));
+  return Array.from(root.querySelectorAll<HTMLButtonElement>("[data-setup-surface] [data-action]"));
 }
 
 function deferred<T>(): {

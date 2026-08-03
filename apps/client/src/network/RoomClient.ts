@@ -134,6 +134,7 @@ export interface LobbyConnection {
   sendVoiceSignal(signal: VoiceSignalIntent): void;
   subscribeVoice(listener: (relay: VoiceRelayEnvelope) => void): () => void;
   subscribe(listener: (snapshot: LobbySnapshot) => void): () => void;
+  leave(): Promise<void>;
 }
 
 export interface RoomClientRoom {
@@ -266,6 +267,10 @@ export class RoomClient implements LobbyConnection {
     this.listeners.add(listener);
     listener(this.snapshot("DISCONNECTED"));
     return () => this.listeners.delete(listener);
+  }
+
+  async leave(): Promise<void> {
+    await this.room?.leave();
   }
 
   pickUp(objectId: string): void {

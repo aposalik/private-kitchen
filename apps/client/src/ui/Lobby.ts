@@ -28,6 +28,7 @@ import {
 } from "./RoleBriefing.js";
 import { CharacterSelect } from "./CharacterSelect.js";
 import { MatchmakingLobby } from "./MatchmakingLobby.js";
+import { RoundCountdown } from "./RoundCountdown.js";
 
 export interface LobbyOptions {
   readonly storage?: Storage;
@@ -59,6 +60,8 @@ export class Lobby {
   private inputMounted = false;
   private unsubscribe: (() => void) | undefined;
   private selectedRecipe: { recipeId?: string; recipeTestToken?: string } | undefined;
+  private countdown!: RoundCountdown;
+  private acknowledgedRole: string | undefined;
 
   private readonly pickCharacter: () => Promise<{ characterId: string }>;
 
@@ -107,8 +110,25 @@ export class Lobby {
         </section>
 
         <section class="operate-surface" data-operate-surface hidden>
+        <div data-countdown-root></div>
+        <div class="role-intro-gate" data-role-intro-gate role="dialog" aria-modal="true" aria-labelledby="role-intro-title" hidden>
+          <h2 id="role-intro-title" class="role-intro-gate__title"></h2>
+          <div class="role-intro-gate__briefing" data-role-intro-briefing></div>
+          <button type="button" data-action="acknowledge-role" class="role-intro-gate__ack">I understand my role — let&rsquo;s cook</button>
+        </div>
+        <section class="waiting-room" data-waiting-room aria-live="polite" hidden>
+          <h2 class="waiting-room__title">Waiting for the kitchen to open</h2>
+          <p class="waiting-room__player-count" data-waiting-player-count>0 / 3 players ready</p>
+          <ul class="waiting-room__player-list" data-waiting-player-list aria-label="Players in room"></ul>
+        </section>
+        <div class="reconnection-overlay" data-reconnection-overlay role="status" aria-live="polite" hidden>
+          <p class="reconnection-overlay__message">Reconnecting&hellip; please wait</p>
+        </div>
         <div class="renderer-marker" data-renderer-marker aria-live="polite">Renderer loading</div>
-        <p class="renderer-error" data-renderer-error role="alert" hidden></p>
+        <div class="renderer-error" data-renderer-error role="alert" hidden>
+          <p data-renderer-error-message></p>
+          <button type="button" data-action="reload-renderer" onclick="location.reload()">Reload page</button>
+        </div>
         <dl class="room-state" data-status-rail aria-live="polite">
           <div><dt>Connection</dt><dd data-field="connection">Disconnected</dd></div>
           <div><dt>Room ID</dt><dd data-field="room">—</dd></div>
@@ -161,6 +181,21 @@ export class Lobby {
           <p class="eyebrow">Local menu</p>
           <h2 id="pause-title">Kitchen paused on this screen</h2>
           <p>The online round remains server-authoritative.</p>
+          <fieldset class="pause-settings">
+            <legend>Settings</legend>
+            <label class="pause-settings__row">
+              <input type="checkbox" data-pause-setting="reducedMotion" />
+              Reduced motion
+            </label>
+            <label class="pause-settings__row">
+              <span>Master volume</span>
+              <input type="range" data-pause-setting="masterVolume" min="0" max="1" step="0.05" value="1" />
+            </label>
+            <label class="pause-settings__row">
+              <span>Voice volume</span>
+              <input type="range" data-pause-setting="voiceVolume" min="0" max="1" step="0.05" value="1" />
+            </label>
+          </fieldset>
           <button type="button" data-resume-game>Resume</button>
         </section>
         </section>
@@ -182,6 +217,10 @@ export class Lobby {
       this.feedbackStore,
       this.exportFeedback,
     );
+    this.countdown = new RoundCountdown(this.root.querySelector<HTMLElement>("[data-countdown-root]")!);
+    this.countdown.mount();
+    this.root.querySelector<HTMLButtonElement>("[data-action=acknowledge-role]")!
+      .addEventListener("click", () => this.acknowledgeRoleIntro());
     this.unsubscribe = this.connection.subscribe((snapshot) => this.render(snapshot));
     this.root.addEventListener("kitchenrenderererror", this.onRendererError);
     new CommunicationPanel(this.root.querySelector<HTMLElement>("[data-communication-root]")!, this.connection).mount();
@@ -247,7 +286,9 @@ export class Lobby {
     const alert = this.root.querySelector<HTMLElement>("[data-renderer-error]");
     if (!alert) return;
     const renderer = detail.renderer === "phaser" ? "Phaser rollback" : "Babylon 3D";
-    alert.textContent = `${renderer} renderer unavailable: ${detail.reason}`;
+    const msg = alert.querySelector<HTMLElement>("[data-renderer-error-message]");
+    if (msg) msg.textContent = `${renderer} renderer unavailable: ${detail.reason}`;
+    else alert.textContent = `${renderer} renderer unavailable: ${detail.reason}`;
     alert.hidden = false;
   };
 
@@ -453,6 +494,9 @@ export class Lobby {
         this.observedRunningMs = 0;
       }
       this.runningStartedAt = now;
+      if (this.observedRoundStatus === "NOT_STARTED") {
+        this.countdown.start();
+      }
     }
     if (isTerminal && !wasTerminal) {
       this.terminalObservationCount += 1;
@@ -477,6 +521,47 @@ export class Lobby {
     });
   }
 
+  private renderRoleIntroGate(snapshot: LobbySnapshot): void {
+    const gate = this.root.querySelector<HTMLElement>("[data-role-intro-gate]")!;
+    const role = snapshot.role;
+    // Auto-dismiss once the round is running — gate must never block gameplay input
+    if (role && snapshot.roundStatus === "RUNNING" && this.acknowledgedRole !== role) {
+      this.acknowledgedRole = role;
+    }
+    if (!role || this.acknowledgedRole === role || snapshot.roundStatus === "RUNNING") {
+      gate.hidden = true;
+      return;
+    }
+    gate.querySelector<HTMLElement>("#role-intro-title")!.textContent = ROLE_LABELS[role];
+    renderRoleBriefing(gate.querySelector<HTMLElement>("[data-role-intro-briefing]")!, {
+      role,
+      phase: briefingPhase(snapshot),
+    });
+    gate.hidden = false;
+  }
+
+  private acknowledgeRoleIntro(): void {
+    const gate = this.root.querySelector<HTMLElement>("[data-role-intro-gate]")!;
+    const title = gate.querySelector<HTMLElement>("#role-intro-title")!.textContent;
+    const role = Object.entries(ROLE_LABELS).find(([, label]) => label === title)?.[0];
+    if (role) this.acknowledgedRole = role;
+    gate.hidden = true;
+  }
+
+  private renderWaitingRoom(snapshot: LobbySnapshot): void {
+    const count = snapshot.connectedCount ?? 0;
+    this.root.querySelector<HTMLElement>("[data-waiting-player-count]")!.textContent =
+      `${count} / ${REQUIRED_PLAYER_COUNT} players ready`;
+    const list = this.root.querySelector<HTMLElement>("[data-waiting-player-list]")!;
+    list.replaceChildren();
+    for (const player of snapshot.players ?? []) {
+      const li = document.createElement("li");
+      li.className = player.connected ? "waiting-room__player" : "waiting-room__player waiting-room__player--away";
+      li.textContent = player.displayName ?? `Player (${ROLE_LABELS[player.role]})`;
+      list.append(li);
+    }
+  }
+
   private renderPresentationState(snapshot: LobbySnapshot): void {
     const phase = briefingPhase(snapshot);
     this.root.dataset.connectionState = snapshot.connectionStatus;
@@ -485,10 +570,16 @@ export class Lobby {
 
     const isOperating = snapshot.connectionStatus === "CONNECTED"
       || snapshot.connectionStatus === "RECONNECTING";
+    const isReconnecting = snapshot.connectionStatus === "RECONNECTING";
     const isTerminal = snapshot.roundStatus === "WON" || snapshot.roundStatus === "LOST";
+    const isWaiting = isOperating && snapshot.roundStatus === "NOT_STARTED";
     this.root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden = isOperating;
     this.root.querySelector<HTMLElement>("[data-operate-surface]")!.hidden = !isOperating;
     this.root.querySelector<HTMLElement>("[data-account-surface]")!.hidden = isOperating && !isTerminal;
+    this.root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden = !isReconnecting;
+    this.root.querySelector<HTMLElement>("[data-waiting-room]")!.hidden = !isWaiting;
+    this.renderWaitingRoom(snapshot);
+    this.renderRoleIntroGate(snapshot);
 
     const briefingRoot = this.root.querySelector<HTMLElement>("[data-role-briefing-root]")!;
     const briefingRenderKey = snapshot.role ? `${snapshot.role}:${phase}` : "";
@@ -564,7 +655,40 @@ export class Lobby {
     progress.className = "round-result-progress";
     progress.textContent = `${snapshot.completedStepCount ?? 0} / ${snapshot.totalStepCount ?? 0} steps completed`;
     result.append(progress);
+
+    const actions = document.createElement("div");
+    actions.className = "round-result-actions";
+
+    const returnBtn = document.createElement("button");
+    returnBtn.type = "button";
+    returnBtn.dataset.action = "return-to-menu";
+    returnBtn.textContent = "Return to menu";
+    returnBtn.addEventListener("click", () => { void this.returnToSetup(); });
+    actions.append(returnBtn);
+
+    if (snapshot.roundStatus === "LOST") {
+      const playAgainBtn = document.createElement("button");
+      playAgainBtn.type = "button";
+      playAgainBtn.dataset.action = "play-again";
+      playAgainBtn.textContent = "Play again";
+      playAgainBtn.addEventListener("click", () => { void this.returnToSetup(); });
+      actions.append(playAgainBtn);
+    }
+
+    result.append(actions);
     root.append(result);
+  }
+
+  private async returnToSetup(): Promise<void> {
+    if (this.worldMounted) {
+      this.world.destroy();
+      this.worldMounted = false;
+    }
+    if (this.inputMounted) {
+      this.input.destroy();
+      this.inputMounted = false;
+    }
+    await this.connection.leave();
   }
 
   private renderPrivateRecipe(snapshot: LobbySnapshot): void {

@@ -1100,6 +1100,10 @@ function deferred<T>(): {
 }
 
 describe("pause settings", () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.reduceMotion;
+  });
+
   function makeMemStorage(): Storage {
     const store: Record<string, string> = {};
     return {
@@ -1121,8 +1125,6 @@ describe("pause settings", () => {
     const checkbox = root.querySelector<HTMLInputElement>('[data-pause-setting="reducedMotion"]')!;
     expect(checkbox.checked).toBe(true);
     expect(document.documentElement.dataset.reduceMotion).toBe("");
-    // cleanup
-    delete document.documentElement.dataset.reduceMotion;
   });
 
   test("toggling reducedMotion checkbox writes storage and toggles attribute", () => {
@@ -1143,8 +1145,6 @@ describe("pause settings", () => {
     checkbox.dispatchEvent(new Event("change"));
     expect(storage.getItem("ck:settings:reducedMotion")).toBe("0");
     expect(document.documentElement.dataset.reduceMotion).toBeUndefined();
-    // cleanup
-    delete document.documentElement.dataset.reduceMotion;
   });
 
   test("masterVolume range input writes to storage", () => {

@@ -1099,6 +1099,88 @@ function deferred<T>(): {
   return { promise, resolve };
 }
 
+describe("pause settings", () => {
+  function makeMemStorage(): Storage {
+    const store: Record<string, string> = {};
+    return {
+      get length() { return Object.keys(store).length; },
+      key: (i) => Object.keys(store)[i] ?? null,
+      getItem: (k) => store[k] ?? null,
+      setItem: (k, v) => { store[k] = v; },
+      removeItem: (k) => { delete store[k]; },
+      clear: () => { for (const k of Object.keys(store)) delete store[k]; },
+    };
+  }
+
+  test("initSettings loads reducedMotion from storage and applies data-reduce-motion", () => {
+    const storage = makeMemStorage();
+    storage.setItem("ck:settings:reducedMotion", "1");
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const checkbox = root.querySelector<HTMLInputElement>('[data-pause-setting="reducedMotion"]')!;
+    expect(checkbox.checked).toBe(true);
+    expect(document.documentElement.dataset.reduceMotion).toBe("");
+    // cleanup
+    delete document.documentElement.dataset.reduceMotion;
+  });
+
+  test("toggling reducedMotion checkbox writes storage and toggles attribute", () => {
+    const storage = makeMemStorage();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const checkbox = root.querySelector<HTMLInputElement>('[data-pause-setting="reducedMotion"]')!;
+    expect(checkbox.checked).toBe(false);
+    expect(document.documentElement.dataset.reduceMotion).toBeUndefined();
+
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event("change"));
+    expect(storage.getItem("ck:settings:reducedMotion")).toBe("1");
+    expect(document.documentElement.dataset.reduceMotion).toBe("");
+
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event("change"));
+    expect(storage.getItem("ck:settings:reducedMotion")).toBe("0");
+    expect(document.documentElement.dataset.reduceMotion).toBeUndefined();
+    // cleanup
+    delete document.documentElement.dataset.reduceMotion;
+  });
+
+  test("masterVolume range input writes to storage", () => {
+    const storage = makeMemStorage();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const slider = root.querySelector<HTMLInputElement>('[data-pause-setting="masterVolume"]')!;
+    slider.value = "0.4";
+    slider.dispatchEvent(new Event("input"));
+    expect(storage.getItem("ck:settings:masterVolume")).toBe("0.4");
+  });
+
+  test("voiceVolume range input writes to storage", () => {
+    const storage = makeMemStorage();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const slider = root.querySelector<HTMLInputElement>('[data-pause-setting="voiceVolume"]')!;
+    slider.value = "0.7";
+    slider.dispatchEvent(new Event("input"));
+    expect(storage.getItem("ck:settings:voiceVolume")).toBe("0.7");
+  });
+
+  test("initSettings initializes sliders from stored values", () => {
+    const storage = makeMemStorage();
+    storage.setItem("ck:settings:masterVolume", "0.3");
+    storage.setItem("ck:settings:voiceVolume", "0.6");
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    expect(root.querySelector<HTMLInputElement>('[data-pause-setting="masterVolume"]')!.value).toBe("0.3");
+    expect(root.querySelector<HTMLInputElement>('[data-pause-setting="voiceVolume"]')!.value).toBe("0.6");
+  });
+});
+
 function privateRecipe(): PrivateRecipePayload {
   return {
     id: "tomato-soup",

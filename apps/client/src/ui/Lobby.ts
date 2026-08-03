@@ -62,6 +62,7 @@ export class Lobby {
   private selectedRecipe: { recipeId?: string; recipeTestToken?: string } | undefined;
   private countdown!: RoundCountdown;
   private acknowledgedRole: string | undefined;
+  private readonly storage: Storage;
 
   private readonly pickCharacter: () => Promise<{ characterId: string }>;
 
@@ -70,7 +71,8 @@ export class Lobby {
     private readonly connection: LobbyConnection,
     options: LobbyOptions = {},
   ) {
-    this.feedbackStore = new PlaytestFeedbackStore(options.storage ?? browserFeedbackStorage());
+    this.storage = options.storage ?? browserFeedbackStorage();
+    this.feedbackStore = new PlaytestFeedbackStore(this.storage);
     this.monotonicNow = options.monotonicNow ?? (() => performance.now());
     this.exportFeedback = options.exportFeedback;
     this.world = options.world ?? createKitchenWorld();
@@ -230,6 +232,7 @@ export class Lobby {
       .addEventListener("click", () => this.openMatchmaking());
     this.root.querySelector<HTMLButtonElement>("[data-resume-game]")!
       .addEventListener("click", () => this.togglePauseOverlay(false));
+    this.initSettings();
 
     if (this.roomInput.value) {
       if (this.nameInput.value) {
@@ -538,6 +541,38 @@ export class Lobby {
       phase: briefingPhase(snapshot),
     });
     gate.hidden = false;
+  }
+
+  private initSettings(): void {
+    const storage = this.storage;
+    const reducedMotion = storage.getItem("ck:settings:reducedMotion") === "1";
+    const masterVolume = parseFloat(storage.getItem("ck:settings:masterVolume") ?? "1");
+    const voiceVolume = parseFloat(storage.getItem("ck:settings:voiceVolume") ?? "1");
+
+    const checkbox = this.root.querySelector<HTMLInputElement>('[data-pause-setting="reducedMotion"]')!;
+    const masterRange = this.root.querySelector<HTMLInputElement>('[data-pause-setting="masterVolume"]')!;
+    const voiceRange = this.root.querySelector<HTMLInputElement>('[data-pause-setting="voiceVolume"]')!;
+
+    checkbox.checked = reducedMotion;
+    masterRange.value = String(masterVolume);
+    voiceRange.value = String(voiceVolume);
+    this.applyReducedMotion(reducedMotion);
+
+    checkbox.addEventListener("change", () => {
+      storage.setItem("ck:settings:reducedMotion", checkbox.checked ? "1" : "0");
+      this.applyReducedMotion(checkbox.checked);
+    });
+    masterRange.addEventListener("input", () => {
+      storage.setItem("ck:settings:masterVolume", masterRange.value);
+    });
+    voiceRange.addEventListener("input", () => {
+      storage.setItem("ck:settings:voiceVolume", voiceRange.value);
+    });
+  }
+
+  private applyReducedMotion(enabled: boolean): void {
+    if (enabled) document.documentElement.dataset.reduceMotion = "";
+    else delete document.documentElement.dataset.reduceMotion;
   }
 
   private acknowledgeRoleIntro(): void {

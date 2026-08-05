@@ -2,6 +2,7 @@ import {
   REQUIRED_PLAYER_COUNT,
   ROLE_LABELS,
 } from "@cooking-game/shared";
+import { sfx } from "../audio/SfxManager.js";
 
 import type {
   ConnectionStatus,
@@ -62,6 +63,7 @@ export class Lobby {
   private selectedRecipe: { recipeId?: string; recipeTestToken?: string } | undefined;
   private countdown!: RoundCountdown;
   private acknowledgedRole: string | undefined;
+  private timerWarnedAt: number | undefined;
   private readonly storage: Storage;
 
   private readonly pickCharacter: () => Promise<{ characterId: string }>;
@@ -121,6 +123,13 @@ export class Lobby {
         <section class="waiting-room" data-waiting-room aria-live="polite" hidden>
           <h2 class="waiting-room__title">Waiting for the kitchen to open</h2>
           <p class="waiting-room__player-count" data-waiting-player-count>0 / 3 players ready</p>
+          <div class="waiting-room__invite">
+            <p class="waiting-room__invite-label">Share this code with friends</p>
+            <div class="waiting-room__code-row">
+              <span class="waiting-room__code" data-invite-code>—</span>
+              <button type="button" class="waiting-room__copy-btn" data-copy-invite aria-label="Copy room code">Copy</button>
+            </div>
+          </div>
           <ul class="waiting-room__player-list" data-waiting-player-list aria-label="Players in room"></ul>
         </section>
         <div class="reconnection-overlay" data-reconnection-overlay role="status" aria-live="polite" hidden>
@@ -153,6 +162,7 @@ export class Lobby {
               <dd><span>0 / 0</span><progress value="0" max="1" aria-label="Completed recipe steps"></progress></dd>
             </div>
           </dl>
+          <p class="dish-goal" data-dish-goal hidden></p>
           <p class="round-guidance" data-round-guidance></p>
         </section>
         <div class="round-result-root" data-round-result-root aria-live="polite"></div>
@@ -230,6 +240,15 @@ export class Lobby {
     this.joinButton.addEventListener("click", () => void this.connect("join"));
     this.root.querySelector<HTMLButtonElement>("[data-action=quick-match]")!
       .addEventListener("click", () => this.openMatchmaking());
+    this.root.querySelector<HTMLButtonElement>("[data-copy-invite]")!
+      .addEventListener("click", () => {
+        const code = this.root.querySelector<HTMLElement>("[data-invite-code]")!.textContent ?? "";
+        void navigator.clipboard.writeText(code).then(() => {
+          const btn = this.root.querySelector<HTMLButtonElement>("[data-copy-invite]")!;
+          btn.textContent = "Copied!";
+          setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+        });
+      });
     this.root.querySelector<HTMLButtonElement>("[data-resume-game]")!
       .addEventListener("click", () => this.togglePauseOverlay(false));
     this.initSettings();
@@ -526,6 +545,7 @@ export class Lobby {
 
   private renderRoleIntroGate(snapshot: LobbySnapshot): void {
     const gate = this.root.querySelector<HTMLElement>("[data-role-intro-gate]")!;
+    const briefing = gate.querySelector<HTMLElement>("[data-role-intro-briefing]")!;
     const role = snapshot.role;
     // Auto-dismiss once the round is running — gate must never block gameplay input
     if (role && snapshot.roundStatus === "RUNNING" && this.acknowledgedRole !== role) {
@@ -533,10 +553,11 @@ export class Lobby {
     }
     if (!role || this.acknowledgedRole === role || snapshot.roundStatus === "RUNNING") {
       gate.hidden = true;
+      briefing.replaceChildren();
       return;
     }
     gate.querySelector<HTMLElement>("#role-intro-title")!.textContent = ROLE_LABELS[role];
-    renderRoleBriefing(gate.querySelector<HTMLElement>("[data-role-intro-briefing]")!, {
+    renderRoleBriefing(briefing, {
       role,
       phase: briefingPhase(snapshot),
     });
@@ -557,16 +578,22 @@ export class Lobby {
     masterRange.value = String(masterVolume);
     voiceRange.value = String(voiceVolume);
     this.applyReducedMotion(reducedMotion);
+    sfx.setMasterVolume(masterVolume);
+    applyVoiceVolume(voiceVolume);
 
     checkbox.addEventListener("change", () => {
       storage.setItem("ck:settings:reducedMotion", checkbox.checked ? "1" : "0");
       this.applyReducedMotion(checkbox.checked);
     });
     masterRange.addEventListener("input", () => {
+      const v = parseFloat(masterRange.value);
       storage.setItem("ck:settings:masterVolume", masterRange.value);
+      sfx.setMasterVolume(v);
     });
     voiceRange.addEventListener("input", () => {
+      const v = parseFloat(voiceRange.value);
       storage.setItem("ck:settings:voiceVolume", voiceRange.value);
+      applyVoiceVolume(v);
     });
   }
 
@@ -581,12 +608,15 @@ export class Lobby {
     const role = Object.entries(ROLE_LABELS).find(([, label]) => label === title)?.[0];
     if (role) this.acknowledgedRole = role;
     gate.hidden = true;
+    gate.querySelector<HTMLElement>("[data-role-intro-briefing]")!.replaceChildren();
   }
 
   private renderWaitingRoom(snapshot: LobbySnapshot): void {
     const count = snapshot.connectedCount ?? 0;
     this.root.querySelector<HTMLElement>("[data-waiting-player-count]")!.textContent =
       `${count} / ${REQUIRED_PLAYER_COUNT} players ready`;
+    this.root.querySelector<HTMLElement>("[data-invite-code]")!.textContent =
+      snapshot.roomId ?? "—";
     const list = this.root.querySelector<HTMLElement>("[data-waiting-player-list]")!;
     list.replaceChildren();
     for (const player of snapshot.players ?? []) {
@@ -634,9 +664,17 @@ export class Lobby {
     const progressLabel = progressContainer.querySelector<HTMLElement>("span")!;
     const progress = progressContainer.querySelector<HTMLProgressElement>("progress")!;
     const guidance = this.root.querySelector<HTMLElement>("[data-round-guidance]")!;
+    const dishGoal = this.root.querySelector<HTMLElement>("[data-dish-goal]")!;
     const role = this.root.querySelector<HTMLElement>("[data-hud-role]")!;
 
     role.textContent = snapshot.role ? ROLE_LABELS[snapshot.role] : "Role pending";
+
+    if (snapshot.recipeTitle && snapshot.roundStatus === "RUNNING") {
+      dishGoal.textContent = `Tonight: ${snapshot.recipeTitle}`;
+      dishGoal.hidden = false;
+    } else {
+      dishGoal.hidden = true;
+    }
     status.textContent = snapshot.roundStatus
       ? formatWords(snapshot.roundStatus)
       : "Waiting";
@@ -654,12 +692,25 @@ export class Lobby {
       : snapshot.roundStatus === "NOT_STARTED"
         ? "Waiting for the round to start."
         : "";
+
+    if (snapshot.roundStatus === "RUNNING"
+      && typeof snapshot.remainingMs === "number"
+      && snapshot.remainingMs <= 30_000
+      && snapshot.remainingMs > 0
+      && this.timerWarnedAt !== this.observedRunningMs) {
+      this.timerWarnedAt = this.observedRunningMs;
+      sfx.play("timer_warning");
+    }
+    if (snapshot.roundStatus !== "RUNNING") {
+      this.timerWarnedAt = undefined;
+    }
   }
 
   private renderRoundResult(snapshot: LobbySnapshot): void {
     const root = this.root.querySelector<HTMLElement>("[data-round-result-root]")!;
     root.replaceChildren();
     if (snapshot.roundStatus !== "WON" && snapshot.roundStatus !== "LOST") return;
+    sfx.play(snapshot.roundStatus === "WON" ? "win" : "lose");
 
     const result = document.createElement("section");
     result.dataset.roundResult = "";
@@ -845,7 +896,7 @@ export class Lobby {
         button.textContent = "Pick up";
         button.dataset.pickUp = object.id;
         button.dataset.worldAction = "";
-        button.addEventListener("click", () => this.connection.pickUp(object.id));
+        button.addEventListener("click", () => { sfx.play("pick_up"); this.connection.pickUp(object.id); });
         actionTray.append(button);
       } else if (canManipulate && object.heldByMe) {
         const button = document.createElement("button");
@@ -853,22 +904,24 @@ export class Lobby {
         button.textContent = "Drop";
         button.dataset.drop = object.id;
         button.dataset.worldAction = "";
-        button.addEventListener("click", () => this.connection.drop(object.id));
+        button.addEventListener("click", () => { sfx.play("drop"); this.connection.drop(object.id); });
         actionTray.append(button);
 
         if (location === "COUNTER" && preparation === "RAW") {
           actionTray.append(
-            this.cookButton("Chop", "CHOP", () => this.connection.chop(object.id)),
+            this.cookButton("Chop", "CHOP", () => { sfx.play("chop"); this.connection.chop(object.id); }),
           );
         } else if (location === "COUNTER" && preparation === "CHOPPED") {
           actionTray.append(
-            this.cookButton("Add to pot", "ADD_TO_POT", () =>
-              this.connection.addToPot(object.id),
-            ),
+            this.cookButton("Add to pot", "ADD_TO_POT", () => {
+              sfx.play("add_to_pot");
+              this.connection.addToPot(object.id);
+            }),
           );
-          const ruin = this.cookButton("Chop again (ruins)", "CHOP", () =>
-            this.connection.chop(object.id),
-          );
+          const ruin = this.cookButton("Chop again (ruins)", "CHOP", () => {
+            sfx.play("chop");
+            this.connection.chop(object.id);
+          });
           ruin.classList.add("danger-action");
           actionTray.append(ruin);
         }
@@ -1134,5 +1187,12 @@ function installKeyboardActivation(button: HTMLButtonElement): void {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     button.click();
+  });
+}
+
+function applyVoiceVolume(volume: number): void {
+  const clamped = Math.max(0, Math.min(1, volume));
+  document.querySelectorAll<HTMLMediaElement>("audio, video").forEach((el) => {
+    el.volume = clamped;
   });
 }

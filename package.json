@@ -26,8 +26,5 @@
     "prisma": "^7.9.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
-  },
-  "dependencies": {
-    "@esbuild/win32-x64": "^0.28.1"
   }
 }

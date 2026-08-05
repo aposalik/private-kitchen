@@ -1015,6 +1015,7 @@ describe("Lobby", () => {
     ackBtn!.click();
 
     expect(gate!.hidden).toBe(true);
+    expect(root.querySelectorAll("[data-role-briefing]")).toHaveLength(1);
   });
 
   test("role introduction gate does not reappear after the same role on subsequent snapshots", () => {

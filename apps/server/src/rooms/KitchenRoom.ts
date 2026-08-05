@@ -115,6 +115,7 @@ export class KitchenState extends Schema {
   completedStepCount = 0;
   totalStepCount = 0;
   outcomeReason: RoundOutcomeReason = "NONE";
+  recipeTitle = "";
 }
 
 defineTypes(KitchenState, {
@@ -128,6 +129,7 @@ defineTypes(KitchenState, {
   completedStepCount: "uint8",
   totalStepCount: "uint8",
   outcomeReason: "string",
+  recipeTitle: "string",
 });
 
 export interface KitchenRoomOptions {
@@ -203,6 +205,7 @@ export class KitchenRoom extends Room {
     }
 
     this.state.placementSeed = options.placementSeed ?? randomUUID();
+    this.state.recipeTitle = this.resolvedRecipe.title;
     let objectSequence = 0;
     for (const ingredient of this.resolvedRecipe.ingredients) {
       for (let index = 0; index < ingredient.count; index += 1) {

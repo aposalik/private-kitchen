@@ -1085,6 +1085,50 @@ canvas[data-editable="true"] { touch-action: none; }
   background: var(--clr-panel);
   font-size: .9rem;
 }
+.waiting-room__invite {
+  background: var(--clr-panel);
+  border: 2px solid var(--clr-gold-dark);
+  border-radius: var(--radius-card);
+  padding: .75rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .5rem;
+}
+.waiting-room__invite-label {
+  margin: 0;
+  font-size: .8rem;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.waiting-room__code-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+.waiting-room__code {
+  font-family: ui-monospace, monospace;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: .15em;
+  color: var(--clr-gold);
+}
+.waiting-room__copy-btn {
+  font: inherit;
+  font-size: .8rem;
+  padding: .25rem .75rem;
+  border: 1.5px solid var(--clr-gold-dark);
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--clr-gold);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.waiting-room__copy-btn:hover {
+  background: var(--clr-gold-dark);
+  color: var(--clr-cream);
+}
 
 /* Role intro gate */
 .role-intro-gate {

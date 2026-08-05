@@ -160,6 +160,29 @@ export function createBabylonKitchenRuntime(
   camera.inputs.clear();
   scene.activeCamera = camera;
 
+  // Right-click drag to orbit the camera horizontally
+  let userAzimuthOffset = 0;
+  let dragActive = false;
+  let dragLastX = 0;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 2) return;
+    dragActive = true;
+    dragLastX = e.clientX;
+    canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragActive) return;
+    userAzimuthOffset -= (e.clientX - dragLastX) * 0.25;
+    dragLastX = e.clientX;
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (e.button !== 2) return;
+    dragActive = false;
+    canvas.releasePointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
   buildLighting(scene);
   buildKitchen(scene, occluders);
   // Kick off async glTF environment loading; procedural kitchen stays visible as fallback
@@ -251,7 +274,8 @@ export function createBabylonKitchenRuntime(
       localPresenter.root.position.z = predicted.z;
       localPresenter.root.rotation.y = predicted.facingYaw;
     }
-    const goal = cameraGoal(players, snapshot?.sessionId);
+    const baseGoal = cameraGoal(players, snapshot?.sessionId);
+    const goal = { ...baseGoal, azimuthDegrees: baseGoal.azimuthDegrees + userAzimuthOffset };
     cameraState = dampCamera(cameraState, goal, deltaSeconds, options.reducedMotion);
     camera.alpha = degrees(cameraState.azimuthDegrees);
     camera.beta = degrees(90 - cameraState.pitchDegrees);
@@ -855,6 +879,37 @@ function applyCharacterTransform(
   if (presenter.rightArm) presenter.rightArm.rotation.x = -stride;
 }
 
+async function loadHeldIngredientGltf(
+  scene: Scene,
+  objectId: string,
+  kind: LobbyObjectSnapshot["kind"],
+  heldAnchor: TransformNode,
+): Promise<void> {
+  const fileName = INGREDIENT_FILE_MAP[kind as KitchenObjectKind];
+  if (!fileName) return;
+  try {
+    const result = await SceneLoader.ImportMeshAsync(
+      '', '/assets/3d/sushi/food/', fileName, scene,
+    );
+    const placeholder = heldAnchor.getChildMeshes(false).find(
+      (m) => m.metadata?.objectId === objectId,
+    );
+    if (!placeholder) {
+      for (const mesh of result.meshes) mesh.dispose();
+      return;
+    }
+    placeholder.isVisible = false;
+    const gltfRoot = new TransformNode(`held-gltf-${objectId}`, scene);
+    gltfRoot.parent = heldAnchor;
+    gltfRoot.scaling.setAll(1.4);
+    for (const mesh of result.meshes) {
+      if (mesh.parent === null) mesh.parent = gltfRoot;
+    }
+  } catch {
+    // sphere fallback stays visible
+  }
+}
+
 function syncHeldIngredient(
   scene: Scene,
   presenter: CharacterNodes,
@@ -877,6 +932,7 @@ function syncHeldIngredient(
   ingredient.parent = presenter.heldAnchor;
   ingredient.material = pbr(scene, `ingredient-${held.id}`, color, 0.55, 0.02);
   ingredient.metadata = { objectId: held.id };
+  void loadHeldIngredientGltf(scene, held.id, held.kind, presenter.heldAnchor);
 }
 
 function syncWorldIngredients(

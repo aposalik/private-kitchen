@@ -74,6 +74,7 @@ export interface LobbySnapshot {
   objects?: readonly LobbyObjectSnapshot[];
   interactionError?: string;
   cookingError?: string;
+  recipeTitle?: string;
   privateRecipe?: PrivateRecipePayload;
   communicationError?: string;
   communicationFeed?: readonly CommunicationEvent[];
@@ -554,6 +555,7 @@ export class RoomClient implements LobbyConnection {
       ...(typeof state?.completedStepCount === "number" ? { completedStepCount: state.completedStepCount } : {}),
       ...(typeof state?.totalStepCount === "number" ? { totalStepCount: state.totalStepCount } : {}),
       ...(state?.outcomeReason ? { outcomeReason: state.outcomeReason } : {}),
+      ...(state?.recipeTitle ? { recipeTitle: state.recipeTitle } : {}),
       objects,
       ...(state?.players ? {
         players: Array.from(state.players.values(), (current) => ({

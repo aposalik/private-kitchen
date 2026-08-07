@@ -547,11 +547,13 @@ export class Lobby {
     const gate = this.root.querySelector<HTMLElement>("[data-role-intro-gate]")!;
     const briefing = gate.querySelector<HTMLElement>("[data-role-intro-briefing]")!;
     const role = snapshot.role;
-    // Auto-dismiss once the round is running — gate must never block gameplay input
-    if (role && snapshot.roundStatus === "RUNNING" && this.acknowledgedRole !== role) {
+    const roundHasStarted = snapshot.roundStatus !== undefined
+      && snapshot.roundStatus !== "NOT_STARTED";
+    // Auto-dismiss after the round starts — the gate must not block gameplay or results.
+    if (role && roundHasStarted && this.acknowledgedRole !== role) {
       this.acknowledgedRole = role;
     }
-    if (!role || this.acknowledgedRole === role || snapshot.roundStatus === "RUNNING") {
+    if (!role || this.acknowledgedRole === role || roundHasStarted) {
       gate.hidden = true;
       briefing.replaceChildren();
       return;

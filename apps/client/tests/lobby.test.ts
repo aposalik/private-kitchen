@@ -1031,6 +1031,26 @@ describe("Lobby", () => {
     expect(root.querySelector<HTMLElement>("[data-role-intro-gate]")!.hidden).toBe(true);
   });
 
+  test.each(["RUNNING", "PAUSED", "WON", "LOST"] as const)(
+    "role introduction gate never blocks an already-started %s round",
+    (roundStatus) => {
+      const connection = new FakeConnection();
+      const root = document.createElement("main");
+      document.body.replaceChildren(root);
+      new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+      connection.emit({
+        connectionStatus: "CONNECTED",
+        role: "BLIND_COOK",
+        connectedCount: roundStatus === "RUNNING" ? 3 : 1,
+        roomStatus: "READY",
+        roundStatus,
+      });
+
+      expect(root.querySelector<HTMLElement>("[data-role-intro-gate]")!.hidden).toBe(true);
+    },
+  );
+
   test("countdown does not fire when reconnecting from PAUSED to RUNNING", () => {
     const connection = new FakeConnection();
     const root = document.createElement("main");

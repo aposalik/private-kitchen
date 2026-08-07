@@ -382,9 +382,10 @@ describe("Phase 7 Babylon representative prototype", () => {
     })).toBeUndefined();
   });
 
-  test("keeps Blind Cook restriction disabled and assets procedural-only", () => {
-    expect(BLIND_COOK_VISION_RESTRICTION_ENABLED).toBe(false);
-    expect(createBlindCookVisionEffect("BLIND_COOK").enabled).toBe(false);
+  test("enables the Blind Cook restriction and keeps procedural assets project-owned", () => {
+    expect(BLIND_COOK_VISION_RESTRICTION_ENABLED).toBe(true);
+    expect(createBlindCookVisionEffect("BLIND_COOK").enabled).toBe(true);
+    expect(createBlindCookVisionEffect("DEAF_KITCHEN_GUIDE").enabled).toBe(false);
     expect(PROCEDURAL_ASSET_MANIFEST.every((asset) =>
       asset.provenance === "PROJECT_PROCEDURAL"
       && asset.license === "PROJECT_OWNED")).toBe(true);

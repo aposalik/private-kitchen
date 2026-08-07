@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 
 describe("Babylon renderer authority boundary", () => {
   test("game3d modules do not import Colyseus or own cooking/recipe outcomes", () => {
+    const authoritativeOutcomeAssignment = /\b(?:privateRecipe|roundStatus|outcomeReason)\s*=(?!=)/;
+    expect("snapshot.roundStatus === \"RUNNING\"").not.toMatch(authoritativeOutcomeAssignment);
+    expect("this.roundStatus = \"RUNNING\"").toMatch(authoritativeOutcomeAssignment);
     const files = [
       "BabylonKitchenWorld",
       "BabylonKitchenScene",
@@ -15,7 +18,7 @@ describe("Babylon renderer authority boundary", () => {
     for (const file of files) {
       const source = readFileSync(new URL(`../src/game3d/${file}.ts`, import.meta.url), "utf8");
       expect(source).not.toMatch(/@colyseus|colyseus\.js/i);
-      expect(source).not.toMatch(/privateRecipe\s*=|roundStatus\s*=|outcomeReason\s*=/);
+      expect(source).not.toMatch(authoritativeOutcomeAssignment);
     }
   });
 

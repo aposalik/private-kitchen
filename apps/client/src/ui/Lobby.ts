@@ -2,6 +2,7 @@ import {
   REQUIRED_PLAYER_COUNT,
   ROLE_LABELS,
 } from "@cooking-game/shared";
+import { sfx } from "../audio/SfxManager.js";
 
 import type {
   ConnectionStatus,
@@ -27,6 +28,8 @@ import {
   type RoleBriefingPhase,
 } from "./RoleBriefing.js";
 import { CharacterSelect } from "./CharacterSelect.js";
+import { MatchmakingLobby } from "./MatchmakingLobby.js";
+import { RoundCountdown } from "./RoundCountdown.js";
 
 export interface LobbyOptions {
   readonly storage?: Storage;
@@ -58,6 +61,10 @@ export class Lobby {
   private inputMounted = false;
   private unsubscribe: (() => void) | undefined;
   private selectedRecipe: { recipeId?: string; recipeTestToken?: string } | undefined;
+  private countdown!: RoundCountdown;
+  private acknowledgedRole: string | undefined;
+  private timerWarnedAt: number | undefined;
+  private readonly storage: Storage;
 
   private readonly pickCharacter: () => Promise<{ characterId: string }>;
 
@@ -66,7 +73,8 @@ export class Lobby {
     private readonly connection: LobbyConnection,
     options: LobbyOptions = {},
   ) {
-    this.feedbackStore = new PlaytestFeedbackStore(options.storage ?? browserFeedbackStorage());
+    this.storage = options.storage ?? browserFeedbackStorage();
+    this.feedbackStore = new PlaytestFeedbackStore(this.storage);
     this.monotonicNow = options.monotonicNow ?? (() => performance.now());
     this.exportFeedback = options.exportFeedback;
     this.world = options.world ?? createKitchenWorld();
@@ -95,17 +103,43 @@ export class Lobby {
           <label for="room-id">Invite code</label>
           <input id="room-id" name="roomId" autocomplete="off" spellcheck="false" placeholder="Room ID" />
           <div class="actions">
+            <button type="button" data-action="quick-match">Quick Match</button>
             <button type="button" data-action="create">Create private room</button>
             <button type="button" class="secondary" data-action="join">Join room</button>
           </div>
+          <div data-matchmaking-root hidden></div>
           <p data-selected-recipe role="status">Recipe: bundled kitchen recipe</p>
           <p class="error" role="alert" hidden></p>
         </div>
         </section>
 
         <section class="operate-surface" data-operate-surface hidden>
+        <div data-countdown-root></div>
+        <div class="role-intro-gate" data-role-intro-gate role="dialog" aria-modal="true" aria-labelledby="role-intro-title" hidden>
+          <h2 id="role-intro-title" class="role-intro-gate__title"></h2>
+          <div class="role-intro-gate__briefing" data-role-intro-briefing></div>
+          <button type="button" data-action="acknowledge-role" class="role-intro-gate__ack">I understand my role — let&rsquo;s cook</button>
+        </div>
+        <section class="waiting-room" data-waiting-room aria-live="polite" hidden>
+          <h2 class="waiting-room__title">Waiting for the kitchen to open</h2>
+          <p class="waiting-room__player-count" data-waiting-player-count>0 / 3 players ready</p>
+          <div class="waiting-room__invite">
+            <p class="waiting-room__invite-label">Share this code with friends</p>
+            <div class="waiting-room__code-row">
+              <span class="waiting-room__code" data-invite-code>—</span>
+              <button type="button" class="waiting-room__copy-btn" data-copy-invite aria-label="Copy room code">Copy</button>
+            </div>
+          </div>
+          <ul class="waiting-room__player-list" data-waiting-player-list aria-label="Players in room"></ul>
+        </section>
+        <div class="reconnection-overlay" data-reconnection-overlay role="status" aria-live="polite" hidden>
+          <p class="reconnection-overlay__message">Reconnecting&hellip; please wait</p>
+        </div>
         <div class="renderer-marker" data-renderer-marker aria-live="polite">Renderer loading</div>
-        <p class="renderer-error" data-renderer-error role="alert" hidden></p>
+        <div class="renderer-error" data-renderer-error role="alert" hidden>
+          <p data-renderer-error-message></p>
+          <button type="button" data-action="reload-renderer" onclick="location.reload()">Reload page</button>
+        </div>
         <dl class="room-state" data-status-rail aria-live="polite">
           <div><dt>Connection</dt><dd data-field="connection">Disconnected</dd></div>
           <div><dt>Room ID</dt><dd data-field="room">—</dd></div>
@@ -128,6 +162,7 @@ export class Lobby {
               <dd><span>0 / 0</span><progress value="0" max="1" aria-label="Completed recipe steps"></progress></dd>
             </div>
           </dl>
+          <p class="dish-goal" data-dish-goal hidden></p>
           <p class="round-guidance" data-round-guidance></p>
         </section>
         <div class="round-result-root" data-round-result-root aria-live="polite"></div>
@@ -158,6 +193,21 @@ export class Lobby {
           <p class="eyebrow">Local menu</p>
           <h2 id="pause-title">Kitchen paused on this screen</h2>
           <p>The online round remains server-authoritative.</p>
+          <fieldset class="pause-settings">
+            <legend>Settings</legend>
+            <label class="pause-settings__row">
+              <input type="checkbox" data-pause-setting="reducedMotion" />
+              Reduced motion
+            </label>
+            <label class="pause-settings__row">
+              <span>Master volume</span>
+              <input type="range" data-pause-setting="masterVolume" min="0" max="1" step="0.05" value="1" />
+            </label>
+            <label class="pause-settings__row">
+              <span>Voice volume</span>
+              <input type="range" data-pause-setting="voiceVolume" min="0" max="1" step="0.05" value="1" />
+            </label>
+          </fieldset>
           <button type="button" data-resume-game>Resume</button>
         </section>
         </section>
@@ -179,13 +229,29 @@ export class Lobby {
       this.feedbackStore,
       this.exportFeedback,
     );
+    this.countdown = new RoundCountdown(this.root.querySelector<HTMLElement>("[data-countdown-root]")!);
+    this.countdown.mount();
+    this.root.querySelector<HTMLButtonElement>("[data-action=acknowledge-role]")!
+      .addEventListener("click", () => this.acknowledgeRoleIntro());
     this.unsubscribe = this.connection.subscribe((snapshot) => this.render(snapshot));
     this.root.addEventListener("kitchenrenderererror", this.onRendererError);
     new CommunicationPanel(this.root.querySelector<HTMLElement>("[data-communication-root]")!, this.connection).mount();
     this.createButton.addEventListener("click", () => void this.connect("create"));
     this.joinButton.addEventListener("click", () => void this.connect("join"));
+    this.root.querySelector<HTMLButtonElement>("[data-action=quick-match]")!
+      .addEventListener("click", () => this.openMatchmaking());
+    this.root.querySelector<HTMLButtonElement>("[data-copy-invite]")!
+      .addEventListener("click", () => {
+        const code = this.root.querySelector<HTMLElement>("[data-invite-code]")!.textContent ?? "";
+        void navigator.clipboard.writeText(code).then(() => {
+          const btn = this.root.querySelector<HTMLButtonElement>("[data-copy-invite]")!;
+          btn.textContent = "Copied!";
+          setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+        });
+      });
     this.root.querySelector<HTMLButtonElement>("[data-resume-game]")!
       .addEventListener("click", () => this.togglePauseOverlay(false));
+    this.initSettings();
 
     if (this.roomInput.value) {
       if (this.nameInput.value) {
@@ -242,9 +308,48 @@ export class Lobby {
     const alert = this.root.querySelector<HTMLElement>("[data-renderer-error]");
     if (!alert) return;
     const renderer = detail.renderer === "phaser" ? "Phaser rollback" : "Babylon 3D";
-    alert.textContent = `${renderer} renderer unavailable: ${detail.reason}`;
+    const msg = alert.querySelector<HTMLElement>("[data-renderer-error-message]");
+    if (msg) msg.textContent = `${renderer} renderer unavailable: ${detail.reason}`;
+    else alert.textContent = `${renderer} renderer unavailable: ${detail.reason}`;
     alert.hidden = false;
   };
+
+  private openMatchmaking(): void {
+    const displayName = this.nameInput.value.trim();
+    if (!displayName) {
+      this.showError("Enter your name before joining Quick Match.");
+      return;
+    }
+    const mmRoot = this.root.querySelector<HTMLElement>("[data-matchmaking-root]")!;
+    const joinPanel = this.root.querySelector<HTMLElement>(".join-panel")!;
+    joinPanel.hidden = true;
+    mmRoot.hidden = false;
+
+    const endpoint = (() => {
+      if (import.meta.env.VITE_SERVER_URL) return import.meta.env.VITE_SERVER_URL as string;
+      const protocol = location.protocol === "https:" ? "wss" : "ws";
+      return `${protocol}://${location.hostname}:2567`;
+    })();
+
+    const characterId = (this.root.querySelector<HTMLInputElement>("[data-character-id]")?.value) ?? "Rabbit_Blond";
+
+    const mm = new MatchmakingLobby(mmRoot, {
+      endpoint,
+      displayName,
+      characterId,
+      onMatch: ({ roomId, ticket, displayName: dn, characterId: cid }) => {
+        mmRoot.hidden = true;
+        joinPanel.hidden = false;
+        void this.connection.joinWithTicket(roomId, dn, cid, ticket);
+      },
+      onCancel: () => {
+        mmRoot.hidden = true;
+        joinPanel.hidden = false;
+        mm.unmount();
+      },
+    });
+    mm.mount();
+  }
 
   private async connect(action: "create" | "join"): Promise<void> {
     const displayName = this.nameInput.value.trim();
@@ -263,12 +368,12 @@ export class Lobby {
     try {
       if (action === "create") {
         if (this.selectedRecipe) {
-          await this.connection.create(displayName, this.selectedRecipe);
+          await this.connection.create(displayName, { characterId, ...this.selectedRecipe });
         } else {
-          await this.connection.create(displayName);
+          await this.connection.create(displayName, { characterId });
         }
       } else {
-        await this.connection.join(roomId, displayName);
+        await this.connection.join(roomId, displayName, characterId);
       }
     } catch {
       this.showError("Unable to connect. Check the room ID and try again.");
@@ -411,6 +516,9 @@ export class Lobby {
         this.observedRunningMs = 0;
       }
       this.runningStartedAt = now;
+      if (this.observedRoundStatus === "NOT_STARTED") {
+        this.countdown.start();
+      }
     }
     if (isTerminal && !wasTerminal) {
       this.terminalObservationCount += 1;
@@ -435,6 +543,92 @@ export class Lobby {
     });
   }
 
+  private renderRoleIntroGate(snapshot: LobbySnapshot): void {
+    const gate = this.root.querySelector<HTMLElement>("[data-role-intro-gate]")!;
+    const briefing = gate.querySelector<HTMLElement>("[data-role-intro-briefing]")!;
+    const role = snapshot.role;
+    const roundHasStarted = snapshot.roundStatus !== undefined
+      && snapshot.roundStatus !== "NOT_STARTED";
+    // Auto-dismiss after the round starts — the gate must not block gameplay or results.
+    if (role && roundHasStarted && this.acknowledgedRole !== role) {
+      this.acknowledgedRole = role;
+    }
+    if (!role || this.acknowledgedRole === role || roundHasStarted) {
+      gate.hidden = true;
+      briefing.replaceChildren();
+      return;
+    }
+    gate.querySelector<HTMLElement>("#role-intro-title")!.textContent = ROLE_LABELS[role];
+    renderRoleBriefing(briefing, {
+      role,
+      phase: briefingPhase(snapshot),
+    });
+    gate.hidden = false;
+  }
+
+  private initSettings(): void {
+    const storage = this.storage;
+    const reducedMotion = storage.getItem("ck:settings:reducedMotion") === "1";
+    const masterVolume = parseFloat(storage.getItem("ck:settings:masterVolume") ?? "1");
+    const voiceVolume = parseFloat(storage.getItem("ck:settings:voiceVolume") ?? "1");
+
+    const checkbox = this.root.querySelector<HTMLInputElement>('[data-pause-setting="reducedMotion"]')!;
+    const masterRange = this.root.querySelector<HTMLInputElement>('[data-pause-setting="masterVolume"]')!;
+    const voiceRange = this.root.querySelector<HTMLInputElement>('[data-pause-setting="voiceVolume"]')!;
+
+    checkbox.checked = reducedMotion;
+    masterRange.value = String(masterVolume);
+    voiceRange.value = String(voiceVolume);
+    this.applyReducedMotion(reducedMotion);
+    sfx.setMasterVolume(masterVolume);
+    applyVoiceVolume(voiceVolume);
+
+    checkbox.addEventListener("change", () => {
+      storage.setItem("ck:settings:reducedMotion", checkbox.checked ? "1" : "0");
+      this.applyReducedMotion(checkbox.checked);
+    });
+    masterRange.addEventListener("input", () => {
+      const v = parseFloat(masterRange.value);
+      storage.setItem("ck:settings:masterVolume", masterRange.value);
+      sfx.setMasterVolume(v);
+    });
+    voiceRange.addEventListener("input", () => {
+      const v = parseFloat(voiceRange.value);
+      storage.setItem("ck:settings:voiceVolume", voiceRange.value);
+      applyVoiceVolume(v);
+    });
+  }
+
+  private applyReducedMotion(enabled: boolean): void {
+    if (enabled) document.documentElement.dataset.reduceMotion = "";
+    else delete document.documentElement.dataset.reduceMotion;
+  }
+
+  private acknowledgeRoleIntro(): void {
+    const gate = this.root.querySelector<HTMLElement>("[data-role-intro-gate]")!;
+    const title = gate.querySelector<HTMLElement>("#role-intro-title")!.textContent;
+    const role = Object.entries(ROLE_LABELS).find(([, label]) => label === title)?.[0];
+    if (role) this.acknowledgedRole = role;
+    gate.hidden = true;
+    gate.querySelector<HTMLElement>("[data-role-intro-briefing]")!.replaceChildren();
+  }
+
+  private renderWaitingRoom(snapshot: LobbySnapshot): void {
+    const count = snapshot.connectedCount ?? 0;
+    this.root.querySelector<HTMLElement>("[data-waiting-player-count]")!.textContent =
+      `${count} / ${REQUIRED_PLAYER_COUNT} players ready`;
+    this.root.querySelector<HTMLElement>("[data-invite-code]")!.textContent =
+      snapshot.roomId ?? "—";
+    const list = this.root.querySelector<HTMLElement>("[data-waiting-player-list]")!;
+    list.replaceChildren();
+    for (const player of snapshot.players ?? []) {
+      const li = document.createElement("li");
+      li.className = player.connected ? "waiting-room__player" : "waiting-room__player waiting-room__player--away";
+      li.textContent = player.displayName ?? `Player (${ROLE_LABELS[player.role]})`;
+      list.append(li);
+    }
+  }
+
   private renderPresentationState(snapshot: LobbySnapshot): void {
     const phase = briefingPhase(snapshot);
     this.root.dataset.connectionState = snapshot.connectionStatus;
@@ -443,10 +637,16 @@ export class Lobby {
 
     const isOperating = snapshot.connectionStatus === "CONNECTED"
       || snapshot.connectionStatus === "RECONNECTING";
+    const isReconnecting = snapshot.connectionStatus === "RECONNECTING";
     const isTerminal = snapshot.roundStatus === "WON" || snapshot.roundStatus === "LOST";
+    const isWaiting = isOperating && snapshot.roundStatus === "NOT_STARTED";
     this.root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden = isOperating;
     this.root.querySelector<HTMLElement>("[data-operate-surface]")!.hidden = !isOperating;
     this.root.querySelector<HTMLElement>("[data-account-surface]")!.hidden = isOperating && !isTerminal;
+    this.root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden = !isReconnecting;
+    this.root.querySelector<HTMLElement>("[data-waiting-room]")!.hidden = !isWaiting;
+    this.renderWaitingRoom(snapshot);
+    this.renderRoleIntroGate(snapshot);
 
     const briefingRoot = this.root.querySelector<HTMLElement>("[data-role-briefing-root]")!;
     const briefingRenderKey = snapshot.role ? `${snapshot.role}:${phase}` : "";
@@ -466,9 +666,17 @@ export class Lobby {
     const progressLabel = progressContainer.querySelector<HTMLElement>("span")!;
     const progress = progressContainer.querySelector<HTMLProgressElement>("progress")!;
     const guidance = this.root.querySelector<HTMLElement>("[data-round-guidance]")!;
+    const dishGoal = this.root.querySelector<HTMLElement>("[data-dish-goal]")!;
     const role = this.root.querySelector<HTMLElement>("[data-hud-role]")!;
 
     role.textContent = snapshot.role ? ROLE_LABELS[snapshot.role] : "Role pending";
+
+    if (snapshot.recipeTitle && snapshot.roundStatus === "RUNNING") {
+      dishGoal.textContent = `Tonight: ${snapshot.recipeTitle}`;
+      dishGoal.hidden = false;
+    } else {
+      dishGoal.hidden = true;
+    }
     status.textContent = snapshot.roundStatus
       ? formatWords(snapshot.roundStatus)
       : "Waiting";
@@ -486,12 +694,25 @@ export class Lobby {
       : snapshot.roundStatus === "NOT_STARTED"
         ? "Waiting for the round to start."
         : "";
+
+    if (snapshot.roundStatus === "RUNNING"
+      && typeof snapshot.remainingMs === "number"
+      && snapshot.remainingMs <= 30_000
+      && snapshot.remainingMs > 0
+      && this.timerWarnedAt !== this.observedRunningMs) {
+      this.timerWarnedAt = this.observedRunningMs;
+      sfx.play("timer_warning");
+    }
+    if (snapshot.roundStatus !== "RUNNING") {
+      this.timerWarnedAt = undefined;
+    }
   }
 
   private renderRoundResult(snapshot: LobbySnapshot): void {
     const root = this.root.querySelector<HTMLElement>("[data-round-result-root]")!;
     root.replaceChildren();
     if (snapshot.roundStatus !== "WON" && snapshot.roundStatus !== "LOST") return;
+    sfx.play(snapshot.roundStatus === "WON" ? "win" : "lose");
 
     const result = document.createElement("section");
     result.dataset.roundResult = "";
@@ -522,7 +743,40 @@ export class Lobby {
     progress.className = "round-result-progress";
     progress.textContent = `${snapshot.completedStepCount ?? 0} / ${snapshot.totalStepCount ?? 0} steps completed`;
     result.append(progress);
+
+    const actions = document.createElement("div");
+    actions.className = "round-result-actions";
+
+    const returnBtn = document.createElement("button");
+    returnBtn.type = "button";
+    returnBtn.dataset.action = "return-to-menu";
+    returnBtn.textContent = "Return to menu";
+    returnBtn.addEventListener("click", () => { void this.returnToSetup(); });
+    actions.append(returnBtn);
+
+    if (snapshot.roundStatus === "LOST") {
+      const playAgainBtn = document.createElement("button");
+      playAgainBtn.type = "button";
+      playAgainBtn.dataset.action = "play-again";
+      playAgainBtn.textContent = "Play again";
+      playAgainBtn.addEventListener("click", () => { void this.returnToSetup(); });
+      actions.append(playAgainBtn);
+    }
+
+    result.append(actions);
     root.append(result);
+  }
+
+  private async returnToSetup(): Promise<void> {
+    if (this.worldMounted) {
+      this.world.destroy();
+      this.worldMounted = false;
+    }
+    if (this.inputMounted) {
+      this.input.destroy();
+      this.inputMounted = false;
+    }
+    await this.connection.leave();
   }
 
   private renderPrivateRecipe(snapshot: LobbySnapshot): void {
@@ -644,7 +898,7 @@ export class Lobby {
         button.textContent = "Pick up";
         button.dataset.pickUp = object.id;
         button.dataset.worldAction = "";
-        button.addEventListener("click", () => this.connection.pickUp(object.id));
+        button.addEventListener("click", () => { sfx.play("pick_up"); this.connection.pickUp(object.id); });
         actionTray.append(button);
       } else if (canManipulate && object.heldByMe) {
         const button = document.createElement("button");
@@ -652,22 +906,24 @@ export class Lobby {
         button.textContent = "Drop";
         button.dataset.drop = object.id;
         button.dataset.worldAction = "";
-        button.addEventListener("click", () => this.connection.drop(object.id));
+        button.addEventListener("click", () => { sfx.play("drop"); this.connection.drop(object.id); });
         actionTray.append(button);
 
         if (location === "COUNTER" && preparation === "RAW") {
           actionTray.append(
-            this.cookButton("Chop", "CHOP", () => this.connection.chop(object.id)),
+            this.cookButton("Chop", "CHOP", () => { sfx.play("chop"); this.connection.chop(object.id); }),
           );
         } else if (location === "COUNTER" && preparation === "CHOPPED") {
           actionTray.append(
-            this.cookButton("Add to pot", "ADD_TO_POT", () =>
-              this.connection.addToPot(object.id),
-            ),
+            this.cookButton("Add to pot", "ADD_TO_POT", () => {
+              sfx.play("add_to_pot");
+              this.connection.addToPot(object.id);
+            }),
           );
-          const ruin = this.cookButton("Chop again (ruins)", "CHOP", () =>
-            this.connection.chop(object.id),
-          );
+          const ruin = this.cookButton("Chop again (ruins)", "CHOP", () => {
+            sfx.play("chop");
+            this.connection.chop(object.id);
+          });
           ruin.classList.add("danger-action");
           actionTray.append(ruin);
         }
@@ -790,6 +1046,7 @@ export class Lobby {
   private setDisabled(disabled: boolean): void {
     this.createButton.disabled = disabled;
     this.joinButton.disabled = disabled;
+    this.quickMatchButton.disabled = disabled;
   }
 
   private updateActionAvailability(): void {
@@ -816,6 +1073,10 @@ export class Lobby {
 
   private get joinButton(): HTMLButtonElement {
     return this.root.querySelector<HTMLButtonElement>("[data-action=join]")!;
+  }
+
+  private get quickMatchButton(): HTMLButtonElement {
+    return this.root.querySelector<HTMLButtonElement>("[data-action=quick-match]")!;
   }
 }
 
@@ -928,5 +1189,12 @@ function installKeyboardActivation(button: HTMLButtonElement): void {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     button.click();
+  });
+}
+
+function applyVoiceVolume(volume: number): void {
+  const clamped = Math.max(0, Math.min(1, volume));
+  document.querySelectorAll<HTMLMediaElement>("audio, video").forEach((el) => {
+    el.volume = clamped;
   });
 }

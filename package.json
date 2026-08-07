@@ -21,8 +21,8 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1",
     "@colyseus/sdk": "^0.17.43",
+    "@playwright/test": "^1.61.1",
     "prisma": "^7.9.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"

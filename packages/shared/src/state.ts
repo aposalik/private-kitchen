@@ -57,4 +57,5 @@ export interface KitchenRoomState {
   readonly completedStepCount: number;
   readonly totalStepCount: number;
   readonly outcomeReason: RoundOutcomeReason;
+  readonly recipeTitle: string;
 }

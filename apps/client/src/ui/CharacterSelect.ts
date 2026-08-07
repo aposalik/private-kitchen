@@ -7,14 +7,10 @@ export interface CharacterSelectResult {
 }
 
 const CHARACTERS: { id: CharacterId; label: string; color: string }[] = [
-  { id: 'Panda',         label: 'Panda',        color: '#4a4a6a' },
-  { id: 'Rabbit_Bald',   label: 'Chef Bald',    color: '#e8d5b0' },
-  { id: 'Rabbit_Blond',  label: 'Chef Blond',   color: '#f5c842' },
-  { id: 'Rabbit_Cyan',   label: 'Chef Cyan',    color: '#42c5f5' },
-  { id: 'Rabbit_Green',  label: 'Chef Green',   color: '#42f57e' },
-  { id: 'Rabbit_Grey',   label: 'Chef Grey',    color: '#9e9e9e' },
-  { id: 'Rabbit_Pink',   label: 'Chef Pink',    color: '#f542a4' },
-  { id: 'Rabbit_Purple', label: 'Chef Purple',  color: '#9942f5' },
+  { id: 'Panda',        label: 'Panda',      color: '#4a4a6a' },
+  { id: 'Rabbit_Blond', label: 'Chef Blond', color: '#f5c842' },
+  { id: 'Rabbit_Cyan',  label: 'Chef Cyan',  color: '#42c5f5' },
+  { id: 'Rabbit_Pink',  label: 'Chef Pink',  color: '#f542a4' },
 ];
 
 export class CharacterSelect {
@@ -71,8 +67,9 @@ export class CharacterSelect {
       }
       .cs-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px; margin-bottom: 28px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px; margin-bottom: 28px;
+        max-width: 360px; margin-inline: auto;
       }
       .cs-char {
         border-radius: 14px; padding: 16px 8px;
@@ -109,13 +106,22 @@ export class CharacterSelect {
     const grid = this.el.querySelector('#cs-grid')!;
     const confirm = this.el.querySelector('#cs-confirm') as HTMLButtonElement;
     let selected: CharacterId | null = null;
-    const EMOJI = ['🐼', '🐰', '🐰', '🐰', '🐰', '🐰', '🐰', '🐰'];
+    const EMOJI: Record<CharacterId, string> = {
+      Panda: '🐼',
+      Rabbit_Bald: '🐰',
+      Rabbit_Blond: '🐰',
+      Rabbit_Cyan: '🐰',
+      Rabbit_Green: '🐰',
+      Rabbit_Grey: '🐰',
+      Rabbit_Pink: '🐰',
+      Rabbit_Purple: '🐰',
+    };
 
-    CHARACTERS.forEach(({ id, label, color }, i) => {
+    CHARACTERS.forEach(({ id, label, color }) => {
       const div = document.createElement('div');
       div.className = 'cs-char';
       div.innerHTML = `
-        <div class="avatar" style="background:${color}22; border: 2px solid ${color}66">${EMOJI[i]}</div>
+        <div class="avatar" style="background:${color}22; border: 2px solid ${color}66">${EMOJI[id]}</div>
         <div class="name">${label}</div>
       `;
       div.addEventListener('click', () => {

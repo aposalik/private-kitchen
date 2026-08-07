@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from "node:fs";
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { beforeEach, afterEach, describe, expect, test, vi } from "vitest";
 
 import type {
   LobbyConnection,
@@ -15,7 +15,12 @@ const quickPickCharacter = (): Promise<{ characterId: string }> =>
 
 describe("Lobby", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     window.history.replaceState({}, "", "/");
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   test("stylesheet encodes the mobile viewport, safe-area, touch target, focus, canvas, wrapping, and motion contract", () => {
@@ -49,7 +54,7 @@ describe("Lobby", () => {
     root.querySelector<HTMLInputElement>(".join-panel [name=displayName]")!.value = "Player One";
     root.querySelector<HTMLButtonElement>("[data-action=create]")!.click();
 
-    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One"));
+    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One", expect.any(Object)));
     expect(root.querySelector<HTMLElement>("[data-auth-root] .error")!.textContent).toBe("Account error");
   });
 
@@ -79,7 +84,7 @@ describe("Lobby", () => {
     await vi.waitFor(() => expect(root.querySelector<HTMLButtonElement>("[data-action=create]")!.disabled).toBe(false));
     root.querySelector<HTMLButtonElement>("[data-action=create]")!.click();
 
-    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Guest Cook"));
+    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Guest Cook", expect.any(Object)));
     expect(root.querySelector<HTMLElement>("[data-auth-root] .error")!.textContent).toBe("");
   });
 
@@ -92,7 +97,7 @@ describe("Lobby", () => {
     new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
 
     await vi.waitFor(() =>
-      expect(connection.join).toHaveBeenCalledWith("INVITE123", "Invited Player"),
+      expect(connection.join).toHaveBeenCalledWith("INVITE123", "Invited Player", expect.any(String)),
     );
     expect(connection.resume).not.toHaveBeenCalled();
   });
@@ -166,7 +171,7 @@ describe("Lobby", () => {
     const name = root.querySelector<HTMLInputElement>("[name=displayName]")!;
     name.value = "Player One";
     root.querySelector<HTMLButtonElement>("[data-action=create]")!.click();
-    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One"));
+    await vi.waitFor(() => expect(connection.create).toHaveBeenCalledWith("Player One", expect.any(Object)));
 
     connection.emit({
       connectionStatus: "CONNECTED",
@@ -893,11 +898,177 @@ describe("Lobby", () => {
     expect(connection.pointAtLocation).toHaveBeenCalledWith(50, 30);
     expect(root.querySelectorAll('input[type="number"], [data-point-controls] input')).toHaveLength(0);
   });
+
+  test("WON result screen shows a Return to menu button that calls leave and restores setup surface", async () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      roomId: "ROOM1",
+      sessionId: "self",
+      role: "BLIND_COOK",
+      connectedCount: 3,
+      roomStatus: "READY",
+      roundStatus: "WON",
+      completedStepCount: 6,
+      totalStepCount: 6,
+    });
+
+    const returnBtn = root.querySelector<HTMLButtonElement>("[data-action=return-to-menu]");
+    expect(returnBtn).not.toBeNull();
+
+    connection.leave.mockImplementation(async () => {
+      connection.emit({ connectionStatus: "DISCONNECTED" });
+    });
+    returnBtn!.click();
+
+    await vi.waitFor(() =>
+      expect(root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden).toBe(false),
+    );
+    expect(connection.leave).toHaveBeenCalled();
+  });
+
+  test("LOST result screen shows a Play again button that calls leave and restores setup surface", async () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({
+      connectionStatus: "CONNECTED",
+      roomId: "ROOM1",
+      sessionId: "self",
+      role: "RECIPE_KEEPER",
+      connectedCount: 3,
+      roomStatus: "READY",
+      roundStatus: "LOST",
+      outcomeReason: "TIME_EXPIRED",
+      completedStepCount: 2,
+      totalStepCount: 6,
+    });
+
+    const playAgainBtn = root.querySelector<HTMLButtonElement>("[data-action=play-again]");
+    expect(playAgainBtn).not.toBeNull();
+
+    connection.leave.mockImplementation(async () => {
+      connection.emit({ connectionStatus: "DISCONNECTED" });
+    });
+    playAgainBtn!.click();
+
+    await vi.waitFor(() =>
+      expect(root.querySelector<HTMLElement>("[data-setup-surface]")!.hidden).toBe(false),
+    );
+    expect(connection.leave).toHaveBeenCalled();
+  });
+
+  test("countdown overlay fires when round transitions NOT_STARTED to RUNNING and hides after 3s", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "NOT_STARTED" });
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(true);
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 180_000 });
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>("[data-countdown-digit]")!.textContent).toBe("3");
+
+    vi.advanceTimersByTime(3000);
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(true);
+  });
+
+  test("prominent reconnection banner appears during RECONNECTING and hides when CONNECTED", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 120_000 });
+    expect(root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden).toBe(true);
+
+    connection.emit({ connectionStatus: "RECONNECTING", role: "BLIND_COOK", connectedCount: 2, roomStatus: "READY", roundStatus: "PAUSED" });
+    expect(root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden).toBe(false);
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 100_000 });
+    expect(root.querySelector<HTMLElement>("[data-reconnection-overlay]")!.hidden).toBe(true);
+  });
+
+  test("role introduction gate appears once when role is first assigned and hides after acknowledgement", async () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 1, roomStatus: "WAITING" });
+
+    const gate = root.querySelector<HTMLElement>("[data-role-intro-gate]");
+    expect(gate).not.toBeNull();
+    expect(gate!.hidden).toBe(false);
+    expect(gate!.textContent).toContain("Blind Cook");
+
+    const ackBtn = gate!.querySelector<HTMLButtonElement>("[data-action=acknowledge-role]");
+    expect(ackBtn).not.toBeNull();
+    ackBtn!.click();
+
+    expect(gate!.hidden).toBe(true);
+    expect(root.querySelectorAll("[data-role-briefing]")).toHaveLength(1);
+  });
+
+  test("role introduction gate does not reappear after the same role on subsequent snapshots", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "RECIPE_KEEPER", connectedCount: 1, roomStatus: "WAITING" });
+    root.querySelector<HTMLButtonElement>("[data-action=acknowledge-role]")!.click();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "RECIPE_KEEPER", connectedCount: 2, roomStatus: "WAITING" });
+    expect(root.querySelector<HTMLElement>("[data-role-intro-gate]")!.hidden).toBe(true);
+  });
+
+  test.each(["RUNNING", "PAUSED", "WON", "LOST"] as const)(
+    "role introduction gate never blocks an already-started %s round",
+    (roundStatus) => {
+      const connection = new FakeConnection();
+      const root = document.createElement("main");
+      document.body.replaceChildren(root);
+      new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+      connection.emit({
+        connectionStatus: "CONNECTED",
+        role: "BLIND_COOK",
+        connectedCount: roundStatus === "RUNNING" ? 3 : 1,
+        roomStatus: "READY",
+        roundStatus,
+      });
+
+      expect(root.querySelector<HTMLElement>("[data-role-intro-gate]")!.hidden).toBe(true);
+    },
+  );
+
+  test("countdown does not fire when reconnecting from PAUSED to RUNNING", () => {
+    const connection = new FakeConnection();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, connection, { pickCharacter: quickPickCharacter }).mount();
+
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 120_000 });
+    vi.advanceTimersByTime(3000);
+    connection.emit({ connectionStatus: "RECONNECTING", role: "BLIND_COOK", connectedCount: 2, roomStatus: "READY", roundStatus: "PAUSED" });
+    connection.emit({ connectionStatus: "CONNECTED", role: "BLIND_COOK", connectedCount: 3, roomStatus: "READY", roundStatus: "RUNNING", remainingMs: 100_000 });
+    expect(root.querySelector<HTMLElement>("[data-round-countdown]")!.hidden).toBe(true);
+  });
 });
 
 class FakeConnection implements LobbyConnection {
   create = vi.fn(async (_displayName: string) => undefined);
   join = vi.fn(async (_roomId: string, _displayName: string) => undefined);
+  joinWithTicket = vi.fn(async (_roomId: string, _displayName: string, _characterId: string, _ticket: string) => undefined);
   resume = vi.fn(async () => false);
   move = vi.fn((_axisX: number, _axisZ: number) => 1);
   pickUp = vi.fn((_objectId: string) => undefined);
@@ -916,6 +1087,7 @@ class FakeConnection implements LobbyConnection {
   sendDrawingStroke = vi.fn();
   clearDrawing = vi.fn();
   sendVoiceSignal = vi.fn();
+  leave = vi.fn(async () => undefined);
   private listeners = new Set<(snapshot: LobbySnapshot) => void>();
 
   subscribe(listener: (snapshot: LobbySnapshot) => void): () => void {
@@ -934,7 +1106,7 @@ class FakeConnection implements LobbyConnection {
 }
 
 function actionButtons(root: HTMLElement): HTMLButtonElement[] {
-  return Array.from(root.querySelectorAll<HTMLButtonElement>("[data-action]"));
+  return Array.from(root.querySelectorAll<HTMLButtonElement>("[data-setup-surface] [data-action]"));
 }
 
 function deferred<T>(): {
@@ -947,6 +1119,88 @@ function deferred<T>(): {
   });
   return { promise, resolve };
 }
+
+describe("pause settings", () => {
+  afterEach(() => {
+    delete document.documentElement.dataset.reduceMotion;
+  });
+
+  function makeMemStorage(): Storage {
+    const store: Record<string, string> = {};
+    return {
+      get length() { return Object.keys(store).length; },
+      key: (i) => Object.keys(store)[i] ?? null,
+      getItem: (k) => store[k] ?? null,
+      setItem: (k, v) => { store[k] = v; },
+      removeItem: (k) => { delete store[k]; },
+      clear: () => { for (const k of Object.keys(store)) delete store[k]; },
+    };
+  }
+
+  test("initSettings loads reducedMotion from storage and applies data-reduce-motion", () => {
+    const storage = makeMemStorage();
+    storage.setItem("ck:settings:reducedMotion", "1");
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const checkbox = root.querySelector<HTMLInputElement>('[data-pause-setting="reducedMotion"]')!;
+    expect(checkbox.checked).toBe(true);
+    expect(document.documentElement.dataset.reduceMotion).toBe("");
+  });
+
+  test("toggling reducedMotion checkbox writes storage and toggles attribute", () => {
+    const storage = makeMemStorage();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const checkbox = root.querySelector<HTMLInputElement>('[data-pause-setting="reducedMotion"]')!;
+    expect(checkbox.checked).toBe(false);
+    expect(document.documentElement.dataset.reduceMotion).toBeUndefined();
+
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event("change"));
+    expect(storage.getItem("ck:settings:reducedMotion")).toBe("1");
+    expect(document.documentElement.dataset.reduceMotion).toBe("");
+
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event("change"));
+    expect(storage.getItem("ck:settings:reducedMotion")).toBe("0");
+    expect(document.documentElement.dataset.reduceMotion).toBeUndefined();
+  });
+
+  test("masterVolume range input writes to storage", () => {
+    const storage = makeMemStorage();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const slider = root.querySelector<HTMLInputElement>('[data-pause-setting="masterVolume"]')!;
+    slider.value = "0.4";
+    slider.dispatchEvent(new Event("input"));
+    expect(storage.getItem("ck:settings:masterVolume")).toBe("0.4");
+  });
+
+  test("voiceVolume range input writes to storage", () => {
+    const storage = makeMemStorage();
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    const slider = root.querySelector<HTMLInputElement>('[data-pause-setting="voiceVolume"]')!;
+    slider.value = "0.7";
+    slider.dispatchEvent(new Event("input"));
+    expect(storage.getItem("ck:settings:voiceVolume")).toBe("0.7");
+  });
+
+  test("initSettings initializes sliders from stored values", () => {
+    const storage = makeMemStorage();
+    storage.setItem("ck:settings:masterVolume", "0.3");
+    storage.setItem("ck:settings:voiceVolume", "0.6");
+    const root = document.createElement("main");
+    document.body.replaceChildren(root);
+    new Lobby(root, new FakeConnection(), { storage }).mount();
+    expect(root.querySelector<HTMLInputElement>('[data-pause-setting="masterVolume"]')!.value).toBe("0.3");
+    expect(root.querySelector<HTMLInputElement>('[data-pause-setting="voiceVolume"]')!.value).toBe("0.6");
+  });
+});
 
 function privateRecipe(): PrivateRecipePayload {
   return {

@@ -20,13 +20,20 @@ export const INITIAL_PLACEMENT_BOUNDS = {
   maxY: 50,
 } as const;
 
-export const KITCHEN_OBJECT_KINDS = ["TOMATO", "ONION", "CARROT", "POTATO"] as const;
+export const KITCHEN_OBJECT_KINDS = [
+  "TOMATO", "ONION", "CARROT", "POTATO",
+  "APPLE", "CABBAGE", "CUCUMBER", "EGG", "EGGPLANT",
+  "AVOCADO", "CRABSTICKS", "EBI", "FISH", "NORI",
+  "OCTOPUS", "RICE", "SALMON", "TUNA",
+] as const;
 
 export const KITCHEN_OBJECT_DEFINITIONS = [
   { kind: "TOMATO", label: "Tomato" },
   { kind: "ONION", label: "Onion" },
   { kind: "CARROT", label: "Carrot" },
   { kind: "POTATO", label: "Potato" },
+  { kind: "APPLE", label: "Apple" },
+  { kind: "CUCUMBER", label: "Cucumber" },
 ] as const;
 
 export type KitchenObjectKind = (typeof KITCHEN_OBJECT_KINDS)[number];

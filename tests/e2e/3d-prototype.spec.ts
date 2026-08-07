@@ -27,8 +27,6 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
   };
   watchErrors(page);
   page.setDefaultTimeout(15_000);
-  // Allow expect() checks more time in CI
-  expect.setTimeout(10_000);
 
   try {
     const username = `phase-c-${Date.now()}`;
@@ -123,9 +121,6 @@ test("Phase C runs a fullscreen authoritative three-player Babylon custom-recipe
       await completeCustomRecipe(blind, players);
     });
     await Promise.all(players.map((player) => expect(player.locator("[data-round-status]")).toHaveText("Won", { timeout: 20_000 })));
-
-    await Promise.allSettled(contexts.splice(0).map((context) => context.close()));
-    await page.close();
 
     await Promise.allSettled(contexts.splice(0).map((context) => context.close()));
     await page.close();

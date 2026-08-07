@@ -7,6 +7,7 @@ const apiProxy = {
 
 export default defineConfig({
   server: {
+    host: true,
     proxy: { "/api": apiProxy },
   },
   preview: {

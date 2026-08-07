@@ -14,7 +14,21 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm install -g npm@11.16.0
+      - run: |
+          node --version
+          npm --version
+          echo "Repository files:"
+          ls -la
+          echo "package.json contents:"
+          cat package.json || true
+          if [ -f package-lock.json ]; then
+            echo "Found package-lock.json — running npm ci"
+            npm ci
+          else
+            echo "No package-lock.json — running npm install"
+            npm install
+          fi
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
@@ -27,7 +41,21 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      - run: npm install -g npm@11.16.0
+      - run: |
+          node --version
+          npm --version
+          echo "Repository files:"
+          ls -la
+          echo "package.json contents:"
+          cat package.json || true
+          if [ -f package-lock.json ]; then
+            echo "Found package-lock.json — running npm ci"
+            npm ci
+          else
+            echo "No package-lock.json — running npm install"
+            npm install
+          fi
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:e2e
       - name: Upload Playwright failure artifacts

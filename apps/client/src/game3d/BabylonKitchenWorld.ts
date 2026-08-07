@@ -3,6 +3,10 @@ import type {
   KitchenWorldAdapter,
 } from "../game/KitchenWorld.js";
 import type { LobbySnapshot } from "../network/RoomClient.js";
+import {
+  createBlindCookVisionEffect,
+  type BlindCookVisionEffect,
+} from "./BlindCookVisionEffect.js";
 
 export interface BabylonRuntime {
   whenReady(): Promise<void>;
@@ -32,6 +36,7 @@ export class BabylonKitchenWorld implements KitchenWorldAdapter {
   private canvas: HTMLCanvasElement | undefined;
   private runtime: BabylonRuntime | undefined;
   private latestSnapshot: LobbySnapshot | undefined;
+  private visionEffect: BlindCookVisionEffect | undefined;
   private readonly queuedPrediction: Array<{
     readonly axisX: number;
     readonly axisZ: number;
@@ -80,6 +85,21 @@ export class BabylonKitchenWorld implements KitchenWorldAdapter {
   update(snapshot: LobbySnapshot): void {
     this.latestSnapshot = snapshot;
     this.runtime?.update(snapshot);
+    this.applyVisionEffect(snapshot);
+  }
+
+  private applyVisionEffect(snapshot: LobbySnapshot): void {
+    const role = snapshot.role;
+    if (!this.visionEffect || this.visionEffect.role !== role) {
+      this.visionEffect?.destroy();
+      this.visionEffect = createBlindCookVisionEffect(role);
+    }
+    if (snapshot.roundStatus === "RUNNING") {
+      this.visionEffect.apply();
+    } else {
+      this.visionEffect.destroy();
+      this.visionEffect = undefined;
+    }
   }
 
   predictMovement(axisX: number, axisZ: number, sequence: number): void {
@@ -95,6 +115,8 @@ export class BabylonKitchenWorld implements KitchenWorldAdapter {
     if (this.destroyed) return;
     this.destroyed = true;
     this.generation += 1;
+    this.visionEffect?.destroy();
+    this.visionEffect = undefined;
     window.removeEventListener("resize", this.onResize);
     this.canvas?.removeEventListener("webglcontextlost", this.onContextLost);
     this.canvas?.removeEventListener("webglcontextrestored", this.onContextRestored);

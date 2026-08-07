@@ -15,6 +15,7 @@ if (!root) {
 
 const lobby = new Lobby(root, new RoomClient());
 lobby.mount();
+document.getElementById("app-loading")?.remove();
 new OrientationGate(root).mount();
 new TouchControls(document.documentElement).mount();
 new AuthPanel(

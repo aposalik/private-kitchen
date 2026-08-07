@@ -474,7 +474,7 @@ async function loadEnvironmentPiece(
     if (rotation) root.rotation = rotation;
     if (scaleFactor !== 1) root.scaling.setAll(scaleFactor);
   } catch (err) {
-    console.error(`[env] Failed to load ${fileName}:`, err);
+    console.warn(`[env] Failed to load ${fileName}; using the procedural fallback:`, err);
     // asset unavailable — procedural mesh already covers this area
   }
 }

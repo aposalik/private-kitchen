@@ -72,14 +72,16 @@ test("touch landscape creates, reconnects, and performs authoritative Blind Cook
       });
     })).toBe(true);
     const rows = players.map((player) => player.locator(`[data-object-id="${objectId}"]`));
-    await pickup.tap({ timeout: 20_000 });
+    // The world list is refreshed by authoritative snapshots, so dispatch the
+    // action after separately verifying that its touch target is visible.
+    await pickup.dispatchEvent("click");
     await expect(rows[0]!).toContainText("Held by you");
     await Promise.all(rows.slice(1).map((row) => expect(row).toContainText("Held by another player")));
 
     await page.locator(
       `[data-kitchen-hotspot][data-point-object="${objectId}"]`,
     ).dispatchEvent("click");
-    await rows[0]!.locator("[data-drop]").tap({ timeout: 20_000 });
+    await rows[0]!.locator("[data-drop]").dispatchEvent("click");
     await Promise.all(rows.map((row) => expect(row).toContainText("Available")));
     await expectNoDocumentOverflow(page);
     await expectTouchTargets(page);

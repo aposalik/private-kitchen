@@ -264,6 +264,30 @@ test("three isolated players communicate under exact role policy and a fourth is
       "totalSteps",
     ]);
 
+    const downloadPromise = blindCook.waitForEvent("download");
+    await blindCook.locator("[data-feedback-export]").click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("cooperative-cooking-playtest-feedback.json");
+    const exportedText = await download.createReadStream().then(
+      (stream) => new Promise<string>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        stream.on("data", (c: Buffer) => chunks.push(c));
+        stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+        stream.on("error", reject);
+      }),
+    );
+    const exportedRecords: unknown[] = JSON.parse(exportedText);
+    expect(exportedRecords).toHaveLength(1);
+    expect((exportedRecords[0] as Record<string, unknown>)["role"]).toBe("BLIND_COOK");
+
+    await blindCook.locator("[data-feedback-clear]").click();
+    await expect(blindCook.locator("[data-feedback-confirmation]")).toContainText("cleared");
+    const afterClear = await blindCook.evaluate(
+      (key) => JSON.parse(localStorage.getItem(key) ?? "[]") as unknown[],
+      PLAYTEST_FEEDBACK_KEY,
+    );
+    expect(afterClear).toHaveLength(0);
+
     const fourth = await newPlayerPage(browser, contexts);
     await autoJoin(fourth, roomId, "Player Four");
     await expect(fourth.getByRole("alert")).toContainText("Unable to connect");

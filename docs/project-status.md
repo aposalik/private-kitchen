@@ -6,6 +6,32 @@ Phase 8 — User-created recipes: implementation and automated verification
 complete; human moderation, physical-device, and exactly-three-person playtest
 gates pending. Phase 7's human playtest gate also remains pending.
 
+## Phase 7 automated infrastructure verification — 2026-08-11
+
+Automated verification of the complete Phase 7 playtest infrastructure:
+
+- `PlaytestFeedbackStore`: append, read, clear, exportJson, 30-record cap,
+  expiry-aware schema validation; 7 unit tests passed
+- `PlaytestDebrief` UI: absent without a terminal context, renders for WON/LOST,
+  5 structured fieldsets with 4 required selects and 7 signal checkboxes, no
+  free-text input, rejects incomplete submission, stores one sanitized record
+  per page lifecycle, export triggers JSON download, clear empties the store and
+  updates the live confirmation region; 4 unit tests passed
+- Full three-player Chromium E2E: complete game WON, on-device debrief visible,
+  submit saves to localStorage with all 12 documented fields, export downloads
+  `cooperative-cooking-playtest-feedback.json` containing the correct record,
+  clear empties localStorage and updates the confirmation region
+- `scripts/start-playtest.sh`: LAN launcher that starts the Colyseus server and
+  Vite client, detects the machine's LAN IP, and prints the facilitator checklist
+  with rotation order, per-round steps, and the protocol reference
+
+Total: 356 tests passed (server 89, client 238, recipe-schema 11, shared 18);
+all five workspace typechecks and builds passed; Playwright full-round Chromium
+scenario passed including export download and clear assertions.
+
+Human gate remains pending: several real three-person role-rotated sessions are
+required. Run `bash scripts/start-playtest.sh` and follow `docs/playtesting.md`.
+
 ## Phase 8 final automated verification — 2026-07-24
 
 - immutable publication, private-test, active-room, and historical recipe

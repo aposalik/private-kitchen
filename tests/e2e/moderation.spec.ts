@@ -44,11 +44,11 @@ test("moderator drill: report, remove, and restore a published recipe", async ({
     expect(recipeId).not.toBe("");
 
     await ownerPage.locator(`[data-validate-recipe="${recipeId}"]`).click();
-    await expect(ownerPage.locator("[role=status]")).toContainText("valid", { timeout: 10_000 });
+    await expect(ownerPage.locator(".studio-feedback[role=status]")).toContainText("valid", { timeout: 10_000 });
 
     await ownerPage.locator("[name=recipeLicense]").selectOption("CC0_1_0");
     await ownerPage.locator(`[data-publish-recipe="${recipeId}"]`).click();
-    await expect(ownerPage.locator("[role=status]")).toContainText("published", { timeout: 10_000 });
+    await expect(ownerPage.locator(".studio-feedback[role=status]")).toContainText("published", { timeout: 10_000 });
 
     // Reporter searches for the recipe and submits a report
     await reporterPage.locator("[name=recipeSearch]").fill("Carrot Bisque");
@@ -58,7 +58,7 @@ test("moderator drill: report, remove, and restore a published recipe", async ({
     await reporterPage.locator("[data-discovery-results] details summary").click();
     await reporterPage.locator(`[data-report-details="${recipeId}"]`).fill("E2E automated moderator drill — report details for review.");
     await reporterPage.locator(`[data-report-recipe="${recipeId}"]`).click();
-    await expect(reporterPage.locator("[role=status]")).toContainText("Report sent", { timeout: 10_000 });
+    await expect(reporterPage.locator(".studio-feedback[role=status]")).toContainText("Report sent", { timeout: 10_000 });
 
     // Moderator reviews open reports
     const reports = await modPage.evaluate(async () => {

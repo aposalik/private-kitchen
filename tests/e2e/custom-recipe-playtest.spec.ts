@@ -35,10 +35,10 @@ test("custom recipe 3-player playtest: create, publish, launch, and complete a 1
 
   // Validate then publish with CC0
   await page.locator(`[data-validate-recipe="${recipeId}"]`).click();
-  await expect(page.locator("[role=status]")).toContainText("valid", { timeout: 10_000 });
+  await expect(page.locator(".studio-feedback[role=status]")).toContainText("valid", { timeout: 10_000 });
   await page.locator("[name=recipeLicense]").selectOption("CC0_1_0");
   await page.locator(`[data-publish-recipe="${recipeId}"]`).click();
-  await expect(page.locator("[role=status]")).toContainText("published", { timeout: 10_000 });
+  await expect(page.locator(".studio-feedback[role=status]")).toContainText("published", { timeout: 10_000 });
 
   // Discover the published recipe and select Launch
   await page.locator("[name=recipeSearch]").fill(TITLE);

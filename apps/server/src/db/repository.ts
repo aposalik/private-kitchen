@@ -265,7 +265,7 @@ export class PrismaRepository {
   async restoreRemovedRecipe(recipeId: string): Promise<boolean> {
     const result = await this.database.ownedRecipe.updateMany({
       where: { id: recipeId, status: "REMOVED" },
-      data: { status: "DRAFT", license: null, publishedAt: null, removedAt: null, removalReason: null },
+      data: { status: "PUBLISHED", removedAt: null, removalReason: null },
     });
     return result.count === 1;
   }

@@ -48,6 +48,7 @@ test("custom recipe 3-player playtest: create, publish, launch, and complete a 1
   await expect(page.locator("[data-selected-recipe]")).toContainText(TITLE, { timeout: 5_000 });
 
   // Owner creates the room
+  await page.locator(".join-panel [name=displayName]").fill("Chef");
   await page.locator("[data-action=create]").click();
   await pickFirstCharacter(page);
   await expect(page.locator("[data-field=room]")).not.toHaveText("—", { timeout: 30_000 });

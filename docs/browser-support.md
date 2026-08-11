@@ -43,51 +43,24 @@ for the Colyseus SDK browser fallback.
 Phase 6 is not complete until current iOS Safari and Android Chrome have recorded
 results. Blank fields are intentional; no physical device was tested here.
 
-On a trusted LAN, build and start the server, expose the Vite client, allow the
-Node processes through the host firewall, and open `http://<HOST_LAN_IP>:5173`
-on each phone:
+**Quick start (HTTPS + microphone support):**
 
 ```bash
-npm run build
-DATABASE_URL=file:./prisma/phase6-device.db npm run start --workspace @cooking-game/server
-npm run dev:client -- --host 0.0.0.0 --port 5173 --strictPort
+bash scripts/start-device-test.sh
 ```
 
-The HTTP LAN origin is sufficient for layout, touch, room, and reconnect checks.
-Microphone capture on non-localhost mobile origins generally requires a trusted
-HTTPS origin and a matching secure (`wss:`) room endpoint; do not report an HTTP
-secure-context refusal as successful audio verification.
+This generates a 24-hour self-signed certificate, starts the Colyseus game
+server on port 2567, starts the Vite HTTPS dev client on port 5173, and prints
+the URL and checklist. Accept the certificate warning on each mobile device
+(see `docs/device-testing.md` for platform-specific steps).
 
-### HTTPS dev setup for microphone testing
+The HTTPS URL is required for microphone capture. The HTTP LAN origin
+(`http://LAN_IP:5173`) is sufficient for layout, touch, room, and reconnect
+checks only; do not report an HTTP secure-context refusal as successful audio
+verification.
 
-Mobile browsers (iOS Safari, Android Chrome) block `getUserMedia` on non-`localhost`
-plain-HTTP origins. To test microphone capture on a real device over LAN:
-
-1. Install the self-signed TLS plugin:
-   ```bash
-   npm install --save-dev @vitejs/plugin-basic-ssl
-   ```
-2. Add it to `apps/client/vite.config.ts` plugins:
-   ```ts
-   import basicSsl from "@vitejs/plugin-basic-ssl";
-   export default defineConfig({ plugins: [basicSsl()], ... });
-   ```
-3. Start the dev server with `--host`:
-   ```bash
-   npm run dev:client -- --host
-   ```
-   Vite now serves `https://YOUR_LAN_IP:5173`. The client automatically routes
-   WebSocket traffic through `wss://YOUR_LAN_IP:5173/colyseus-ws` (Vite proxy
-   → local Colyseus on :2567).
-4. On the mobile device, open `https://YOUR_LAN_IP:5173` and accept the
-   self-signed certificate warning.
-5. Grant microphone permission when prompted. The role-filtered audio path
-   (Recipe Keeper hears both, Blind Cook hears one, Deaf Guide hears none)
-   can now be verified on real hardware.
-
-Do not commit the `@vitejs/plugin-basic-ssl` plugin to the permanent
-`vite.config.ts` — use it only for device testing sessions. Remove it before
-committing to keep the production config clean.
+For full setup details, certificate acceptance steps, and troubleshooting see
+`docs/device-testing.md`.
 
 | Check | iOS Safari result / evidence | Android Chrome result / evidence |
 | --- | --- | --- |

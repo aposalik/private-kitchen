@@ -32,6 +32,37 @@ scenario passed including export download and clear assertions.
 Human gate remains pending: several real three-person role-rotated sessions are
 required. Run `bash scripts/start-playtest.sh` and follow `docs/playtesting.md`.
 
+## Physical device gate infrastructure — 2026-08-11
+
+Infrastructure for the pending physical iOS Safari and Android Chrome gate:
+
+- `apps/client/vite.device-test.ts`: HTTPS overlay Vite config that reads
+  `DEVICE_TEST_CERT` and `DEVICE_TEST_KEY` env vars (cert/key PEM paths) and
+  merges them onto the base config; fails clearly at startup if the env vars are
+  absent so it is never used accidentally outside the device-test script
+- `scripts/start-device-test.sh`: generates a 24-hour self-signed TLS cert via
+  `openssl` for the machine's LAN IP (SAN includes the IP and localhost), starts
+  the Colyseus server and the Vite HTTPS client, exports the cert/key paths, and
+  prints the device testing checklist; removes the cert directory on exit
+- `docs/device-testing.md`: comprehensive guide covering the full test matrix,
+  iOS Safari and Android Chrome certificate acceptance steps, microphone
+  permission flow, role-filtered audio verification protocol, three-device LAN
+  round procedure, and troubleshooting (cert trust, firewall, WebSocket, portrait
+  lock)
+- `docs/browser-support.md`: physical-device gate section updated to reference
+  `bash scripts/start-device-test.sh` as the authoritative entry point and
+  `docs/device-testing.md` for platform-specific details; superseded inline
+  `@vitejs/plugin-basic-ssl` manual steps removed
+
+Total unit tests remain 356; no new automated tests (the gate is inherently
+manual). The automated Playwright matrix (5 projects, 9 cases) continues to
+cover emulated Pixel Chrome and iPhone WebKit for layout and touch regressions.
+
+Physical gate remains pending: a real iOS Safari device and a real Android
+Chrome device must each pass the full matrix in `docs/browser-support.md` and
+results recorded there before the gate is closed. Run
+`bash scripts/start-device-test.sh` and follow `docs/device-testing.md`.
+
 ## Phase 8 human gate infrastructure verification — 2026-08-11
 
 Automated verification of the Phase 8 human gate drill infrastructure:

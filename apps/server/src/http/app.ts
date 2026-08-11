@@ -80,6 +80,13 @@ export function createKitchenHttpApp(options: KitchenHttpAppOptions) {
   const explicitOrigins = new Set(options.allowedOrigins ?? configuredOrigins());
 
   app.disable("x-powered-by");
+
+  // Health check — used by container orchestrators and load balancers.
+  // No auth or CORS middleware; must remain cheap and allocation-free.
+  app.get("/health", (_request, response) => {
+    response.json({ status: "ok", timestamp: now().toISOString(), uptime: process.uptime() });
+  });
+
   app.use("/api", (request, response, next) => {
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method)) {
       const origin = request.get("origin");

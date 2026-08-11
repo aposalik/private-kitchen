@@ -32,6 +32,48 @@ scenario passed including export download and clear assertions.
 Human gate remains pending: several real three-person role-rotated sessions are
 required. Run `bash scripts/start-playtest.sh` and follow `docs/playtesting.md`.
 
+## Phase 10 production hardening — 2026-08-11
+
+Infrastructure for operating the game in a shared or production environment:
+
+- `GET /health` endpoint added to `apps/server/src/http/app.ts`: returns
+  `{ status: "ok", timestamp, uptime }` with no authentication or CORS
+  overhead; used by container healthchecks, load balancers, and smoke tests
+- `.github/workflows/ci.yml` refactored: removed the duplicated diagnostic
+  install block from both jobs (the `package-lock.json` existence check was
+  unnecessary since the lockfile is always committed); both jobs now run
+  `npm ci` directly; `npm audit --omit=dev --audit-level=high` added to the
+  validate job so high/critical production dependency advisories block CI
+- `apps/server/Dockerfile`: multi-stage build that installs dependencies,
+  compiles TypeScript and generates the Prisma client in the build stage, then
+  copies only the compiled output and production node_modules into a clean
+  Alpine runtime image; the Prisma CLI binary is copied from the build stage so
+  `prisma migrate deploy` runs at container startup before the server process
+  begins; the SQLite database file is stored on a named volume at `/data`
+- `infra/docker-compose.yml` updated: the previous aspirational PostgreSQL
+  service is replaced with a server container built from the Dockerfile;
+  includes a `wget`-based healthcheck on `/health`, a `kitchen_data` named
+  volume for the SQLite file, and commented environment variable placeholders
+  for `ALLOWED_ORIGINS` and `MODERATOR_USERNAMES`
+- `docs/runbook.md` created: operations guide covering environment variables,
+  development and container startup, production bare-Node startup, database
+  migrations, SQLite backup and restore (file copy and live `.backup`), health
+  check usage, moderator API fetch snippets, incident response for crashes /
+  database corruption / high latency, and a quick reference table for all human
+  gate launcher scripts
+- `docs/release-checklist.md` created: structured pre-deployment and post-deploy
+  checklist covering automated gates (unit tests, typecheck, build, audit, E2E),
+  code quality scans, all four human gates with their launcher scripts, operations
+  readiness checks (env vars, backup, health, migration), documentation currency,
+  and a post-deploy smoke sequence; includes the existing accepted-risk note for
+  the Prisma dev-tooling audit advisories
+- `README.md` updated from Phase 2 state to Phase 8: correct workspace list,
+  accurate command reference, container deployment quick start, health check
+  example, human gate launcher table, and a documentation index
+
+Total unit tests remain 356; no production code paths changed other than the
+addition of the health endpoint. All five workspace typechecks remain clean.
+
 ## Physical device gate infrastructure — 2026-08-11
 
 Infrastructure for the pending physical iOS Safari and Android Chrome gate:

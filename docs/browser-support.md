@@ -58,6 +58,37 @@ Microphone capture on non-localhost mobile origins generally requires a trusted
 HTTPS origin and a matching secure (`wss:`) room endpoint; do not report an HTTP
 secure-context refusal as successful audio verification.
 
+### HTTPS dev setup for microphone testing
+
+Mobile browsers (iOS Safari, Android Chrome) block `getUserMedia` on non-`localhost`
+plain-HTTP origins. To test microphone capture on a real device over LAN:
+
+1. Install the self-signed TLS plugin:
+   ```bash
+   npm install --save-dev @vitejs/plugin-basic-ssl
+   ```
+2. Add it to `apps/client/vite.config.ts` plugins:
+   ```ts
+   import basicSsl from "@vitejs/plugin-basic-ssl";
+   export default defineConfig({ plugins: [basicSsl()], ... });
+   ```
+3. Start the dev server with `--host`:
+   ```bash
+   npm run dev:client -- --host
+   ```
+   Vite now serves `https://YOUR_LAN_IP:5173`. The client automatically routes
+   WebSocket traffic through `wss://YOUR_LAN_IP:5173/colyseus-ws` (Vite proxy
+   → local Colyseus on :2567).
+4. On the mobile device, open `https://YOUR_LAN_IP:5173` and accept the
+   self-signed certificate warning.
+5. Grant microphone permission when prompted. The role-filtered audio path
+   (Recipe Keeper hears both, Blind Cook hears one, Deaf Guide hears none)
+   can now be verified on real hardware.
+
+Do not commit the `@vitejs/plugin-basic-ssl` plugin to the permanent
+`vite.config.ts` — use it only for device testing sessions. Remove it before
+committing to keep the production config clean.
+
 | Check | iOS Safari result / evidence | Android Chrome result / evidence |
 | --- | --- | --- |
 | Device, OS, browser versions | Pending — | Pending — |

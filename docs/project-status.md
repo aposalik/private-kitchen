@@ -32,6 +32,39 @@ scenario passed including export download and clear assertions.
 Human gate remains pending: several real three-person role-rotated sessions are
 required. Run `bash scripts/start-playtest.sh` and follow `docs/playtesting.md`.
 
+## Phase 8 human gate infrastructure verification — 2026-08-11
+
+Automated verification of the Phase 8 human gate drill infrastructure:
+
+- `playwright.config.ts`: added `MODERATOR_USERNAMES: "e2e-moderator"` to the
+  E2E server environment so the designated account can exercise the moderation
+  endpoints (`GET /api/moderation/recipe-reports`,
+  `POST /api/moderation/recipes/:id/remove`,
+  `POST /api/moderation/recipes/:id/restore`) during Playwright runs
+- Moderator drill E2E (`tests/e2e/moderation.spec.ts`): registers three isolated
+  accounts (moderator, recipe owner, reporter); owner creates a 1-carrot recipe,
+  validates, and publishes under CC0; reporter searches, opens the report form,
+  and submits a reason and detail; moderator verifies the report appears in the
+  moderation list, removes the recipe (204; discovery returns 0 results), then
+  restores it (204; discovery returns 1 result again)
+- Custom recipe 3-player E2E (`tests/e2e/custom-recipe-playtest.spec.ts`): owner
+  creates and publishes a 1-carrot recipe, discovers it in the studio, clicks
+  Launch, creates a room, two guests join, Blind Cook completes all 6 steps
+  (chop, add-to-pot, season, boil, mix, plate with 6 / 6 progress), and all
+  three players reach the WON terminal screen
+- `scripts/start-moderator-drill.sh`: LAN launcher that starts the full dev
+  stack with a configurable `MODERATOR_USERNAMES` env and prints a step-by-step
+  drill guide with in-browser fetch snippets for each moderator API call
+
+Total unit tests remain 356 (server 89, client 238, recipe-schema 11, shared 18);
+two new Playwright E2E scenarios added to `tests/e2e/`.
+
+Human gates remain pending: a real moderator must execute the report→review→
+remove→restore drill from a live browser session, and a real three-person team
+must complete a game with a custom recipe. Run
+`bash scripts/start-moderator-drill.sh` for the moderation drill and
+`bash scripts/start-playtest.sh` for the custom recipe playtest.
+
 ## Phase 8 final automated verification — 2026-07-24
 
 - immutable publication, private-test, active-room, and historical recipe

@@ -6,6 +6,138 @@ Phase 8 — User-created recipes: implementation and automated verification
 complete; human moderation, physical-device, and exactly-three-person playtest
 gates pending. Phase 7's human playtest gate also remains pending.
 
+## Phase 7 automated infrastructure verification — 2026-08-11
+
+Automated verification of the complete Phase 7 playtest infrastructure:
+
+- `PlaytestFeedbackStore`: append, read, clear, exportJson, 30-record cap,
+  expiry-aware schema validation; 7 unit tests passed
+- `PlaytestDebrief` UI: absent without a terminal context, renders for WON/LOST,
+  5 structured fieldsets with 4 required selects and 7 signal checkboxes, no
+  free-text input, rejects incomplete submission, stores one sanitized record
+  per page lifecycle, export triggers JSON download, clear empties the store and
+  updates the live confirmation region; 4 unit tests passed
+- Full three-player Chromium E2E: complete game WON, on-device debrief visible,
+  submit saves to localStorage with all 12 documented fields, export downloads
+  `cooperative-cooking-playtest-feedback.json` containing the correct record,
+  clear empties localStorage and updates the confirmation region
+- `scripts/start-playtest.sh`: LAN launcher that starts the Colyseus server and
+  Vite client, detects the machine's LAN IP, and prints the facilitator checklist
+  with rotation order, per-round steps, and the protocol reference
+
+Total: 356 tests passed (server 89, client 238, recipe-schema 11, shared 18);
+all five workspace typechecks and builds passed; Playwright full-round Chromium
+scenario passed including export download and clear assertions.
+
+Human gate remains pending: several real three-person role-rotated sessions are
+required. Run `bash scripts/start-playtest.sh` and follow `docs/playtesting.md`.
+
+## Phase 10 production hardening — 2026-08-11
+
+Infrastructure for operating the game in a shared or production environment:
+
+- `GET /health` endpoint added to `apps/server/src/http/app.ts`: returns
+  `{ status: "ok", timestamp, uptime }` with no authentication or CORS
+  overhead; used by container healthchecks, load balancers, and smoke tests
+- `.github/workflows/ci.yml` refactored: removed the duplicated diagnostic
+  install block from both jobs (the `package-lock.json` existence check was
+  unnecessary since the lockfile is always committed); both jobs now run
+  `npm ci` directly; `npm audit --omit=dev --audit-level=high` added to the
+  validate job so high/critical production dependency advisories block CI
+- `apps/server/Dockerfile`: multi-stage build that installs dependencies,
+  compiles TypeScript and generates the Prisma client in the build stage, then
+  copies only the compiled output and production node_modules into a clean
+  Alpine runtime image; the Prisma CLI binary is copied from the build stage so
+  `prisma migrate deploy` runs at container startup before the server process
+  begins; the SQLite database file is stored on a named volume at `/data`
+- `infra/docker-compose.yml` updated: the previous aspirational PostgreSQL
+  service is replaced with a server container built from the Dockerfile;
+  includes a `wget`-based healthcheck on `/health`, a `kitchen_data` named
+  volume for the SQLite file, and commented environment variable placeholders
+  for `ALLOWED_ORIGINS` and `MODERATOR_USERNAMES`
+- `docs/runbook.md` created: operations guide covering environment variables,
+  development and container startup, production bare-Node startup, database
+  migrations, SQLite backup and restore (file copy and live `.backup`), health
+  check usage, moderator API fetch snippets, incident response for crashes /
+  database corruption / high latency, and a quick reference table for all human
+  gate launcher scripts
+- `docs/release-checklist.md` created: structured pre-deployment and post-deploy
+  checklist covering automated gates (unit tests, typecheck, build, audit, E2E),
+  code quality scans, all four human gates with their launcher scripts, operations
+  readiness checks (env vars, backup, health, migration), documentation currency,
+  and a post-deploy smoke sequence; includes the existing accepted-risk note for
+  the Prisma dev-tooling audit advisories
+- `README.md` updated from Phase 2 state to Phase 8: correct workspace list,
+  accurate command reference, container deployment quick start, health check
+  example, human gate launcher table, and a documentation index
+
+Total unit tests remain 356; no production code paths changed other than the
+addition of the health endpoint. All five workspace typechecks remain clean.
+
+## Physical device gate infrastructure — 2026-08-11
+
+Infrastructure for the pending physical iOS Safari and Android Chrome gate:
+
+- `apps/client/vite.device-test.ts`: HTTPS overlay Vite config that reads
+  `DEVICE_TEST_CERT` and `DEVICE_TEST_KEY` env vars (cert/key PEM paths) and
+  merges them onto the base config; fails clearly at startup if the env vars are
+  absent so it is never used accidentally outside the device-test script
+- `scripts/start-device-test.sh`: generates a 24-hour self-signed TLS cert via
+  `openssl` for the machine's LAN IP (SAN includes the IP and localhost), starts
+  the Colyseus server and the Vite HTTPS client, exports the cert/key paths, and
+  prints the device testing checklist; removes the cert directory on exit
+- `docs/device-testing.md`: comprehensive guide covering the full test matrix,
+  iOS Safari and Android Chrome certificate acceptance steps, microphone
+  permission flow, role-filtered audio verification protocol, three-device LAN
+  round procedure, and troubleshooting (cert trust, firewall, WebSocket, portrait
+  lock)
+- `docs/browser-support.md`: physical-device gate section updated to reference
+  `bash scripts/start-device-test.sh` as the authoritative entry point and
+  `docs/device-testing.md` for platform-specific details; superseded inline
+  `@vitejs/plugin-basic-ssl` manual steps removed
+
+Total unit tests remain 356; no new automated tests (the gate is inherently
+manual). The automated Playwright matrix (5 projects, 9 cases) continues to
+cover emulated Pixel Chrome and iPhone WebKit for layout and touch regressions.
+
+Physical gate remains pending: a real iOS Safari device and a real Android
+Chrome device must each pass the full matrix in `docs/browser-support.md` and
+results recorded there before the gate is closed. Run
+`bash scripts/start-device-test.sh` and follow `docs/device-testing.md`.
+
+## Phase 8 human gate infrastructure verification — 2026-08-11
+
+Automated verification of the Phase 8 human gate drill infrastructure:
+
+- `playwright.config.ts`: added `MODERATOR_USERNAMES: "e2e-moderator"` to the
+  E2E server environment so the designated account can exercise the moderation
+  endpoints (`GET /api/moderation/recipe-reports`,
+  `POST /api/moderation/recipes/:id/remove`,
+  `POST /api/moderation/recipes/:id/restore`) during Playwright runs
+- Moderator drill E2E (`tests/e2e/moderation.spec.ts`): registers three isolated
+  accounts (moderator, recipe owner, reporter); owner creates a 1-carrot recipe,
+  validates, and publishes under CC0; reporter searches, opens the report form,
+  and submits a reason and detail; moderator verifies the report appears in the
+  moderation list, removes the recipe (204; discovery returns 0 results), then
+  restores it (204; discovery returns 1 result again)
+- Custom recipe 3-player E2E (`tests/e2e/custom-recipe-playtest.spec.ts`): owner
+  creates and publishes a 1-carrot recipe, discovers it in the studio, clicks
+  Launch, creates a room, two guests join, Blind Cook completes all 6 steps
+  (chop, add-to-pot, season, boil, mix, plate with 6 / 6 progress), and all
+  three players reach the WON terminal screen
+- `scripts/start-moderator-drill.sh`: LAN launcher that starts the full dev
+  stack with a configurable `MODERATOR_USERNAMES` env and prints a step-by-step
+  drill guide with in-browser fetch snippets for each moderator API call
+
+Total unit tests remain 356 (server 89, client 238, recipe-schema 11, shared 18);
+two new Playwright E2E scenarios added to `tests/e2e/`.
+
+Human gates remain pending: a real moderator must execute the report→review→
+remove→restore drill from a live browser session, and a real three-person team
+must complete a game with a custom recipe. Run
+`bash scripts/start-moderator-drill.sh` for the moderation drill and
+`bash scripts/start-playtest.sh` for the custom recipe playtest.
+
 ## Phase 8 final automated verification — 2026-07-24
 
 - immutable publication, private-test, active-room, and historical recipe

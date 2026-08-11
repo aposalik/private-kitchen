@@ -1,19 +1,28 @@
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: cooking
-      POSTGRES_PASSWORD: cooking
-      POSTGRES_DB: cooking_game
+  server:
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
     ports:
-      - "5432:5432"
+      - "2567:2567"
+    environment:
+      DATABASE_URL: file:/data/kitchen.db
+      PORT: "2567"
+      HOST: "0.0.0.0"
+      NODE_ENV: production
+      # Set ALLOWED_ORIGINS to your client origin, e.g.:
+      # ALLOWED_ORIGINS: "https://yourgame.example.com"
+      # Set MODERATOR_USERNAMES to a comma-separated list of moderator usernames.
+      # MODERATOR_USERNAMES: "mod1,mod2"
     volumes:
-      - cooking_postgres:/var/lib/postgresql/data
+      - kitchen_data:/data
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cooking -d cooking_game"]
-      interval: 5s
+      test: ["CMD-SHELL", "wget -qO- http://localhost:2567/health || exit 1"]
+      interval: 30s
       timeout: 5s
-      retries: 10
+      retries: 3
+      start_period: 15s
 
 volumes:
-  cooking_postgres:
+  kitchen_data:

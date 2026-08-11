@@ -792,6 +792,11 @@ function defaultEndpoint(): string {
   if (import.meta.env.VITE_SERVER_URL) {
     return import.meta.env.VITE_SERVER_URL;
   }
-  const protocol = location.protocol === "https:" ? "wss" : "ws";
-  return `${protocol}://${location.hostname}:2567`;
+  // When served over HTTPS (e.g. Cloudflare tunnel or reverse proxy), route
+  // WebSocket traffic through the /colyseus-ws Vite proxy so the browser can
+  // upgrade on the same port/domain without direct access to :2567.
+  if (location.protocol === "https:") {
+    return `wss://${location.host}/colyseus-ws`;
+  }
+  return `ws://${location.hostname}:2567`;
 }

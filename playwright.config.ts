@@ -53,6 +53,7 @@ export default defineConfig({
       env: {
         NODE_ENV: "e2e",
         DATABASE_URL: e2eDatabase.databaseUrl,
+        MODERATOR_USERNAMES: "e2e-moderator",
       },
       reuseExistingServer: false,
       stdout: "pipe",

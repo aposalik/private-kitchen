@@ -450,7 +450,7 @@ function waitForState(
   predicate: (state: KitchenRoomState) => boolean,
   timeoutMs = 2_000,
 ): Promise<void> {
-  if (predicate(room.state)) {
+  if (room.state && predicate(room.state)) {
     return Promise.resolve();
   }
 

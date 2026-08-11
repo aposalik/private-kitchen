@@ -115,8 +115,13 @@ export class MatchmakingRoom extends Room<RoomOptions> {
 
     const matchId = this.clientMatchId.get(client.sessionId);
     if (matchId) {
-      this.applyPenalty(client.sessionId);
-      void this.cancelMatch(matchId, "DECLINED", client.sessionId);
+      const match = this.pendingMatches.get(matchId);
+      if (match) {
+        this.pendingMatches.delete(matchId);
+        clearTimeout(match.timer);
+        this.applyPenalty(client.sessionId);
+        void this.cancelMatch(match, "DECLINED", client.sessionId);
+      }
     }
     this.clientMatchId.delete(client.sessionId);
     this.broadcastQueueSize();
@@ -271,7 +276,8 @@ export class MatchmakingRoom extends Room<RoomOptions> {
       }
     }
 
-    await this.cancelMatch(matchId, cancelReason, declinerId);
+    // Pass the match object directly — pendingMatches no longer holds it.
+    await this.cancelMatch(match, cancelReason, declinerId);
   }
 
   private async launchKitchenRoom(match: PendingMatch): Promise<void> {
@@ -284,7 +290,7 @@ export class MatchmakingRoom extends Room<RoomOptions> {
       });
       roomId = created.roomId;
     } catch {
-      await this.cancelMatch(match.matchId, "TIMEOUT", undefined);
+      await this.cancelMatch(match, "TIMEOUT", undefined);
       return;
     }
 
@@ -301,19 +307,22 @@ export class MatchmakingRoom extends Room<RoomOptions> {
   }
 
   private async cancelMatch(
-    matchId: string,
+    match: PendingMatch,
     reason: "TIMEOUT" | "DECLINED",
     penalizedId: string | undefined,
   ): Promise<void> {
-    const match = this.pendingMatches.get(matchId);
-    const entries = match?.entries ?? [];
-
-    for (const e of entries) {
+    for (const e of match.entries) {
       this.clientMatchId.delete(e.sessionId);
       const client = this.clients.find((c) => c.sessionId === e.sessionId);
       if (!client) continue;
 
-      const isPenalized = e.sessionId === penalizedId || !match?.readySet.has(e.sessionId);
+      // For DECLINED only the explicit decliner loses their queue slot.
+      // For TIMEOUT every player who did not confirm is penalised.
+      const isPenalized =
+        reason === "DECLINED"
+          ? e.sessionId === penalizedId
+          : !match.readySet.has(e.sessionId);
+
       if (isPenalized) {
         this.sendEvent(client, { type: "MATCH_CANCELLED", reason, requeued: false });
         client.leave();

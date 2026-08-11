@@ -43,20 +43,24 @@ for the Colyseus SDK browser fallback.
 Phase 6 is not complete until current iOS Safari and Android Chrome have recorded
 results. Blank fields are intentional; no physical device was tested here.
 
-On a trusted LAN, build and start the server, expose the Vite client, allow the
-Node processes through the host firewall, and open `http://<HOST_LAN_IP>:5173`
-on each phone:
+**Quick start (HTTPS + microphone support):**
 
 ```bash
-npm run build
-DATABASE_URL=file:./prisma/phase6-device.db npm run start --workspace @cooking-game/server
-npm run dev:client -- --host 0.0.0.0 --port 5173 --strictPort
+bash scripts/start-device-test.sh
 ```
 
-The HTTP LAN origin is sufficient for layout, touch, room, and reconnect checks.
-Microphone capture on non-localhost mobile origins generally requires a trusted
-HTTPS origin and a matching secure (`wss:`) room endpoint; do not report an HTTP
-secure-context refusal as successful audio verification.
+This generates a 24-hour self-signed certificate, starts the Colyseus game
+server on port 2567, starts the Vite HTTPS dev client on port 5173, and prints
+the URL and checklist. Accept the certificate warning on each mobile device
+(see `docs/device-testing.md` for platform-specific steps).
+
+The HTTPS URL is required for microphone capture. The HTTP LAN origin
+(`http://LAN_IP:5173`) is sufficient for layout, touch, room, and reconnect
+checks only; do not report an HTTP secure-context refusal as successful audio
+verification.
+
+For full setup details, certificate acceptance steps, and troubleshooting see
+`docs/device-testing.md`.
 
 | Check | iOS Safari result / evidence | Android Chrome result / evidence |
 | --- | --- | --- |
